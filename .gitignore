@@ -1,0 +1,5 @@
+.devbox
+devbox.lock
+dist
+node_modules
+*.zip
