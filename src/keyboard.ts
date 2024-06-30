@@ -13,6 +13,7 @@ import type { Key } from "./types/oskLayout.js";
 const KEY_LONG_PRESS_TIME = 250 as const;
 
 const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
+const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
 const FCITX_INTERFACE_CONTROLLER = "org.fcitx.Fcitx.Controller1" as const;
 const KIMPANEL_INTERFACE_INPUTMETHOD = "org.kde.kimpanel.inputmethod" as const;
 
@@ -337,12 +338,14 @@ export const CustomKeyboard = GObject.registerClass(
       this._toggleIMKeySet = new Set();
       this._kanaActive = false;
 
-      this._setKeyboard();
+      this._setupKeyboard();
     }
 
     destroy(): void {
-      if (this._dbusSignal != null)
+      if (this._dbusSignal != null) {
         this._conn?.signal_unsubscribe(this._dbusSignal);
+        this._dbusSignal = null;
+      }
       this._conn = null;
 
       this._injectionManager?.clear();
@@ -453,6 +456,11 @@ export const CustomKeyboard = GObject.registerClass(
           }
 
           if (key.action != null) {
+            if (key.action === "toggleIM") {
+              if (_this._kanaActive) button.setLatched(_this._kanaActive);
+              _this._toggleIMKeySet?.add(button);
+            }
+
             button.connect("released", () => {
               if (key.action === "hide") {
                 this.close(true);
@@ -468,7 +476,7 @@ export const CustomKeyboard = GObject.registerClass(
               } else if (key.action === "toggleIM") {
                 _this._conn?.call(
                   FCITX_BUS_NAME,
-                  "/controller",
+                  FCITX_CONTROLLER_OBJECT_PATH,
                   FCITX_INTERFACE_CONTROLLER,
                   "Toggle",
                   null,
@@ -477,11 +485,6 @@ export const CustomKeyboard = GObject.registerClass(
                   -1,
                   null
                 );
-
-                button.keyButton?.add_style_class_name("kana-toggle-key");
-                console.log("KAAAAAAAAAAAAAAAAAAANA", _this._kanaActive);
-                if (_this._kanaActive) button.setLatched(_this._kanaActive);
-                _this._toggleIMKeySet?.add(button);
               } else if (!this._longPressed && key.action === "levelSwitch") {
                 if (key.level) this._setActiveLevel(key.level);
                 this._setLatched(
@@ -528,7 +531,7 @@ export const CustomKeyboard = GObject.registerClass(
       };
     }
 
-    _setKeyboard() {
+    _setupKeyboard() {
       Main.layoutManager.removeChrome(Main.layoutManager.keyboardBox);
 
       const destroyed = this._destroyKeyboard();
@@ -560,9 +563,17 @@ export const CustomKeyboard = GObject.registerClass(
 
           const value = (params as GLib.Variant).deepUnpack<string>();
 
-          const kanaActive = /^\/Fcitx\/im:Mozc:fcitx-mozc:全角かな/.test(
-            value
-          );
+          /**
+           * Supported IM
+           * - fcitx-anthy
+           * - fcitx-kkc
+           * - fcitx-mozc
+           * - fcitx-skk
+           */
+          const kanaActive =
+            /^\/Fcitx\/im:(?:Anthy:fcitx-anthy:ひらがな|Mozc:fcitx-mozc:全角かな|SKK:fcitx_skk:ひらがな|かな漢字:fcitx_kkc:ひらがな)/.test(
+              value
+            );
 
           this._kanaActive = kanaActive;
           for (const button of this._toggleIMKeySet.values()) {
