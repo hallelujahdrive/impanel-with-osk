@@ -312,7 +312,8 @@ export const CustomKeyboard = GObject.registerClass(
     private _dbusSignal: number | null;
     private _dir: Gio.File;
     private _injectionManager: InjectionManager | null;
-    private _available = true;
+    private _kanaActive: boolean;
+    private _toggleIMKeySet: Set<typeof CustomKey.prototype> | null;
     // end-remove
 
     constructor(dir: Gio.File) {
@@ -333,6 +334,10 @@ export const CustomKeyboard = GObject.registerClass(
       );
 
       this._injectionManager = new InjectionManager();
+      this._toggleIMKeySet = new Set();
+      this._kanaActive = false;
+
+      this._setKeyboard();
     }
 
     destroy(): void {
@@ -343,7 +348,17 @@ export const CustomKeyboard = GObject.registerClass(
       this._injectionManager?.clear();
       this._injectionManager = null;
 
-      this._resetKeyboard();
+      this._toggleIMKeySet = null;
+
+      Main.layoutManager.removeChrome(Main.layoutManager.keyboardBox);
+
+      const destroyed = this._destroyKeyboard();
+
+      this._getModifiedLayouts()?._unregister();
+      this._getDefaultLayouts()._register();
+
+      if (destroyed) Main.keyboard._keyboard = new Keyboard.Keyboard();
+      Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
     }
 
     _getModifiedLayouts(): Gio.Resource | null {
@@ -363,23 +378,6 @@ export const CustomKeyboard = GObject.registerClass(
       );
     }
 
-    _resetKeyboard(): void {
-      Main.layoutManager.removeChrome(Main.layoutManager.keyboardBox);
-
-      const destroyed = this._destroyKeyboard();
-
-      this._injectionManager?.restoreMethod(
-        Keyboard.Keyboard.prototype,
-        "_addRowKeys"
-      );
-
-      this._getModifiedLayouts()?._unregister();
-      this._getDefaultLayouts()._register();
-
-      if (destroyed) Main.keyboard._keyboard = new Keyboard.Keyboard();
-      Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
-    }
-
     _destroyKeyboard(): boolean {
       try {
         (Main.keyboard.keyboardActor as Keyboard.Keyboard).destroy();
@@ -395,7 +393,7 @@ export const CustomKeyboard = GObject.registerClass(
     _overrideAddRowKeys(
       _originalMethod: typeof Keyboard.Keyboard.prototype._addRowKeys
     ): typeof Keyboard.Keyboard.prototype._addRowKeys {
-      const conn = this._conn;
+      const _this = this;
 
       return function (
         this: Keyboard.Keyboard,
@@ -468,7 +466,7 @@ export const CustomKeyboard = GObject.registerClass(
                 this._keyboardController.toggleDelete(true);
                 this._keyboardController.toggleDelete(false);
               } else if (key.action === "toggleIM") {
-                conn?.call(
+                _this._conn?.call(
                   FCITX_BUS_NAME,
                   "/controller",
                   FCITX_INTERFACE_CONTROLLER,
@@ -477,15 +475,13 @@ export const CustomKeyboard = GObject.registerClass(
                   null,
                   Gio.DBusCallFlags.NONE,
                   -1,
-                  null,
-                  (_, res) => {
-                    console.log(
-                      "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALBACK",
-                      res,
-                      res.legacy_propagate_error()
-                    );
-                  }
+                  null
                 );
+
+                button.keyButton?.add_style_class_name("kana-toggle-key");
+                console.log("KAAAAAAAAAAAAAAAAAAANA", _this._kanaActive);
+                if (_this._kanaActive) button.setLatched(_this._kanaActive);
+                _this._toggleIMKeySet?.add(button);
               } else if (!this._longPressed && key.action === "levelSwitch") {
                 if (key.level) this._setActiveLevel(key.level);
                 this._setLatched(
@@ -559,44 +555,24 @@ export const CustomKeyboard = GObject.registerClass(
       params: unknown
     ): void {
       switch (signal) {
-        case "RegisterProperties": {
-          const value = (params as GLib.Variant).deepUnpack<string[]>();
-
-          const notAvailable = /^\/Fcitx\/im:(使用不可|Not available)/.test(
-            value[0]
-          );
-          // console.log(
-          //   "CAAAAAAAAAAAAAAALLLLLLLLBACK",
-          //   value,
-          //   this._available,
-          //   notAvailable
-          // );
-
-          if (this._available === !notAvailable) return;
-
-          this._available = !notAvailable;
-
-          if (this._available) {
-            this._setKeyboard();
-          } else {
-            this._resetKeyboard();
-          }
-          return;
-        }
         case "UpdateProperty": {
-          if (!this._available) return;
+          if (this._toggleIMKeySet == null) return;
 
           const value = (params as GLib.Variant).deepUnpack<string>();
 
-          const kana = /^\/Fcitx\/im:Mozc:fcitx-mozc:全角かな/.test(value);
-          const level = kana ? "kana" : "default";
-          (Main.keyboard.keyboardActor as Keyboard.Keyboard)._setActiveLevel(
-            level
+          const kanaActive = /^\/Fcitx\/im:Mozc:fcitx-mozc:全角かな/.test(
+            value
           );
+
+          this._kanaActive = kanaActive;
+          for (const button of this._toggleIMKeySet.values()) {
+            button.setLatched(kanaActive);
+          }
+
           return;
         }
-        default:
-          console.log(signal, (params as GLib.Variant).deepUnpack());
+        // default:
+        //   console.log(signal, (params as GLib.Variant).deepUnpack());
       }
     }
   }

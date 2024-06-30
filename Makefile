@@ -1,4 +1,4 @@
-NAME=osk-for-fcitx-jp
+NAME=fcitx-jp-osk
 DOMAIN=52hertz-reunion.site
 
 .PHONY: all pack install clean

@@ -1,4 +1,4 @@
-# OSK for Fcitx JP
+# Fcitx JP OSK
 
 ## Environment
 - nodejs : v22.x or later

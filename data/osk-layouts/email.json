@@ -43,7 +43,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["a", "à", "á", "â", "ä", "æ", "ã", "å", "ā"]
           },
           {
@@ -118,23 +118,18 @@
         ],
         [
           {
-            "action": "toggleIM",
-            "label": "あ"
-          },
-          {
             "action": "levelSwitch",
             "label": "?123",
             "level": "opt",
             "width": 1.5
           },
           {
-            "action": "emoji",
-            "iconName": "face-smile-symbolic",
+            "strings": ["@"],
             "width": 1.5
           },
           {
             "strings": [" "],
-            "width": 4
+            "width": 5
           },
           {
             "action": "languageMenu",
@@ -192,7 +187,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["A", "À", "Á", "Â", "Ä", "Æ", "Ã", "Å", "Ā"]
           },
           {
@@ -267,23 +262,18 @@
         ],
         [
           {
-            "action": "toggleIM",
-            "label": "あ"
-          },
-          {
             "action": "levelSwitch",
             "label": "?123",
             "level": "opt",
             "width": 1.5
           },
           {
-            "action": "emoji",
-            "iconName": "face-smile-symbolic",
+            "strings": ["@"],
             "width": 1.5
           },
           {
             "strings": [" "],
-            "width": 4
+            "width": 5
           },
           {
             "action": "languageMenu",
@@ -341,7 +331,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["@"]
           },
           {
@@ -411,10 +401,6 @@
         ],
         [
           {
-            "action": "toggleIM",
-            "label": "あ"
-          },
-          {
             "action": "levelSwitch",
             "label": "ABC",
             "level": "default",
@@ -428,7 +414,7 @@
           },
           {
             "strings": [" "],
-            "width": 2
+            "width": 3
           },
           {
             "strings": [","]
@@ -494,7 +480,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["£"]
           },
           {
@@ -564,10 +550,6 @@
         ],
         [
           {
-            "action": "toggleIM",
-            "label": "あ"
-          },
-          {
             "action": "levelSwitch",
             "label": "ABC",
             "level": "default",
@@ -581,7 +563,7 @@
           },
           {
             "strings": [" "],
-            "width": 2
+            "width": 3
           },
           {
             "strings": [","]
@@ -605,6 +587,5 @@
       ]
     }
   ],
-  "locale": "en",
-  "name": "English United States"
+  "name": "Email keymap"
 }

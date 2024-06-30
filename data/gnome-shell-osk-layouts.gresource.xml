@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/org/gnome/shell/osk-layouts">
+    <file>digits.json</file>
+    <file>email.json</file>
+    <file>number.json</file>
     <file>us.json</file>
   </gresource>
 </gresources>

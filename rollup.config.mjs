@@ -1,3 +1,4 @@
+import scss from "rollup-plugin-scss";
 import typescript from "@rollup/plugin-typescript";
 
 /**
@@ -39,6 +40,7 @@ export default {
     "resource:///org/gnome/shell/ui/main.js",
   ],
   plugins: [
+    scss({ fileName: "stylesheet.css" }),
     typescript({
       compilerOptions: {
         module: "ESNext",
