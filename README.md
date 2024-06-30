@@ -4,11 +4,11 @@ Fcitx JP OSK is a GNOME Shell extension that adds new functionality to your GNOM
 
 ## Features
 
-- Adds a Japanese IM switching button to Gnome OSK.
+- Adds a Japanese IM switching button to Gnome OnScreen Keyboard.
 
 ## Screenshots
 
-<img alt="screenshot" src="docs/screenshot.png" width="50%"></img>
+<img alt="screenshot" src="docs/screenshot.png" max-width="100%" width="640px"></img>
 
 ## Installation
 
