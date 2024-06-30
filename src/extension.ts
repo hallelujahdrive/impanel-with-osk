@@ -1,16 +1,29 @@
-import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
-import { CustomKeyboard } from "./keyboard.js";
+import type Gio from "gi://Gio";
+import {
+	Extension,
+	type ExtensionMetadata,
+} from "resource:///org/gnome/shell/extensions/extension.js";
+import { Kimpanel } from "./kimpanel.js";
+
+import "./stylesheet.css";
 
 export default class PlainExampleExtension extends Extension {
-  private _keyboard: typeof CustomKeyboard.prototype | null = null;
+	private kimpanel: typeof Kimpanel.prototype | null = null;
+	private settings: Gio.Settings;
 
-  public enable() {
-    if (this._keyboard) return;
-    this._keyboard = new CustomKeyboard(this.dir);
-  }
+	constructor(metadata: ExtensionMetadata) {
+		super(metadata);
 
-  public disable() {
-    this._keyboard?.destroy();
-    this._keyboard = null;
-  }
+		this.settings = this.getSettings();
+	}
+
+	public disable() {
+		this.kimpanel?.destroy();
+		this.kimpanel = null;
+	}
+
+	public enable() {
+		if (this.kimpanel) return;
+		this.kimpanel = new Kimpanel(this.settings, this.dir);
+	}
 }

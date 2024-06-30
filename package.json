@@ -1,28 +1,38 @@
 {
-  "name": "osk-for-fcitx-jp",
-  "version": "1.0.0",
+  "name": "impanel-with-osk",
+  "version": "0.0.0",
   "type": "module",
   "main": "extension.js",
   "scripts": {
     "build": "rollup -c",
-    "check": "npx @biomejs/biome check --write ./src",
+    "check": "npx @biomejs/biome check --write ./src && npx eslint ./src --fix",
     "ci": "npx @biomejs/biome ci ./src",
-    "format": "npx @biomejs/biome format --write ./src",
-    "lint": "npx @biomejs/biome lint ./src",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "format": "npx @biomejs/biome format --write ./src && npx eslint ./src --fix",
+    "lint": "npx @biomejs/biome lint ./src && npx eslint ./src",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
   },
   "author": "hallelujahdrive",
-  "license": "WTFPL",
+  "license": "GPL-3.0-only",
   "description": "",
   "devDependencies": {
     "@biomejs/biome": "1.8.2",
-    "@girs/gjs": "^3.3.0",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.9.0",
+    "@girs/gjs": "^4.0.0-beta.5",
+    "@girs/glib-2.0": "^2.80.0-4.0.0-beta.5",
     "@girs/gnome-shell": "^46.0.0-beta8",
+    "@girs/gobject-2.0": "^2.80.0-4.0.0-beta.5",
     "@girs/ibus-1.0": "^1.5.11-3.3.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.6",
+    "eslint-plugin-sort-keys-fix": "^1.1.2",
+    "husky": "^9.1.4",
     "rollup": "^4.18.0",
+    "rollup-plugin-scss": "^4.0.0",
+    "sass": "^1.77.6",
     "tslib": "^2.6.3",
-    "typescript": "^5.5.2"
+    "typescript": "^5.5.2",
+    "typescript-eslint": "^8.1.0"
   }
 }

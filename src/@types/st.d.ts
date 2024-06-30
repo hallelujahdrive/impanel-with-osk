@@ -1,22 +1,22 @@
-import type StBase from "gi://St";
+import "gi://St";
 
 declare module "@girs/st-14" {
-  export namespace St {
-    interface Button extends StBase.Button {
-      _extendedKeys: StBase.BoxLayout | null;
-      extendedKey: string | null;
+	export namespace St {
+		interface Button {
+			_extendedKeys: StBase.BoxLayout | null;
+			extendedKey: string | null;
 
-      connectObject(
-        id: string,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        callback: (...args: any[]) => any,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        arg: any
-      ): number;
+			connectObject(
+				id: string,
+				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+				callback: (...args: any[]) => any,
+				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+				arg: any,
+			): number;
 
-      disconnectObject(thisObj: object, obj?: object): void;
-    }
-  }
+			disconnectObject(thisObj: object, obj?: object): void;
+		}
+	}
 
-  export default St;
+	export default St;
 }

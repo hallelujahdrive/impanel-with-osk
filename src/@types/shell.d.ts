@@ -1,14 +1,15 @@
 declare module "@girs/shell-14" {
-  import type Clutter from "gi://Clutter";
-  import type ShellBase from "gi://Shell";
+	import type Clutter from "gi://Clutter";
+	import type Meta from "gi://Meta";
+	export namespace Shell {
+		type CreateOverrideFunc = (originalMethod: function) => function;
 
-  export namespace Shell {
-    type CreateOverrideFunc = (originalMethod: function) => function;
+		interface Global {
+			get display(): Meta.Display;
 
-    interface Global extends ShellBase.Global {
-      get stage(): Clutter.Stage;
-    }
-  }
+			get stage(): Clutter.Stage;
+		}
+	}
 
-  export default Shell;
+	export default Shell;
 }

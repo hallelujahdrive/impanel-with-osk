@@ -1,0 +1,2 @@
+npm run check
+git update-index --again

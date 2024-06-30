@@ -43,7 +43,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["a", "à", "á", "â", "ä", "æ", "ã", "å", "ā"]
           },
           {
@@ -118,34 +118,28 @@
         ],
         [
           {
-            "action": "languageMenu",
-            "iconName": "keyboard-layout-filled-symbolic"
-          },
-          {
             "action": "levelSwitch",
             "label": "?123",
             "level": "opt",
             "width": 1.5
           },
           {
-            "action": "emoji",
-            "iconName": "face-smile-symbolic"
+            "strings": ["@"],
+            "width": 1.5
           },
           {
             "strings": [" "],
             "width": 5
           },
           {
-            "iconName": "pan-start-symbolic",
-            "keyval": "0xff51"
-          },
-          {
-            "iconName": "pan-end-symbolic",
-            "keyval": "0xff53"
+            "action": "languageMenu",
+            "iconName": "keyboard-layout-symbolic",
+            "width": 1.5
           },
           {
             "action": "hide",
-            "iconName": "keyboard-hide-symbolic"
+            "iconName": "keyboard-hide-symbolic",
+            "width": 2
           }
         ]
       ]
@@ -193,7 +187,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["A", "À", "Á", "Â", "Ä", "Æ", "Ã", "Å", "Ā"]
           },
           {
@@ -268,34 +262,28 @@
         ],
         [
           {
-            "action": "languageMenu",
-            "iconName": "keyboard-layout-filled-symbolic"
-          },
-          {
             "action": "levelSwitch",
             "label": "?123",
             "level": "opt",
             "width": 1.5
           },
           {
-            "action": "emoji",
-            "iconName": "face-smile-symbolic"
+            "strings": ["@"],
+            "width": 1.5
           },
           {
             "strings": [" "],
             "width": 5
           },
           {
-            "iconName": "pan-start-symbolic",
-            "keyval": "0xff51"
-          },
-          {
-            "iconName": "pan-end-symbolic",
-            "keyval": "0xff53"
+            "action": "languageMenu",
+            "iconName": "keyboard-layout-symbolic",
+            "width": 1.5
           },
           {
             "action": "hide",
-            "iconName": "keyboard-hide-symbolic"
+            "iconName": "keyboard-hide-symbolic",
+            "width": 2
           }
         ]
       ]
@@ -343,7 +331,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["@"]
           },
           {
@@ -413,10 +401,6 @@
         ],
         [
           {
-            "action": "languageMenu",
-            "iconName": "keyboard-layout-filled-symbolic"
-          },
-          {
             "action": "levelSwitch",
             "label": "ABC",
             "level": "default",
@@ -441,6 +425,10 @@
           {
             "action": "emoji",
             "iconName": "face-smile-symbolic"
+          },
+          {
+            "action": "languageMenu",
+            "iconName": "keyboard-layout-symbolic"
           },
           {
             "action": "hide",
@@ -492,7 +480,7 @@
         ],
         [
           {
-            "leftOffset": 0.5,
+            "start": 0.5,
             "strings": ["£"]
           },
           {
@@ -562,10 +550,6 @@
         ],
         [
           {
-            "action": "languageMenu",
-            "iconName": "keyboard-layout-filled-symbolic"
-          },
-          {
             "action": "levelSwitch",
             "label": "ABC",
             "level": "default",
@@ -592,6 +576,10 @@
             "iconName": "face-smile-symbolic"
           },
           {
+            "action": "languageMenu",
+            "iconName": "keyboard-layout-symbolic"
+          },
+          {
             "action": "hide",
             "iconName": "keyboard-hide-symbolic"
           }
@@ -599,6 +587,5 @@
       ]
     }
   ],
-  "locale": "en",
-  "name": "English United States"
+  "name": "Email keymap"
 }

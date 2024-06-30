@@ -1,8 +1,8 @@
 {
-  "name": "OSK for Fcitx JP",
-  "description": "description",
-  "uuid": "osk-for-fcitx-jp@52hertz-reunion.site",
-  "shell-version": [
-    "46"
-  ]
+  "name": "IM Panel integrated with OSK",
+  "description": "IM Panel Integrated with OSK is a GNOME Shell extension that improves the operation of input methods on touch screens by adding several features to the GNOME OnScreen Keyboard.",
+  "uuid": "impanel-with-osk@52hertz-reunion.site",
+  "shell-version": ["46"],
+  "gettext-domain": "impanel-with-osk@52hertz-reunion.site",
+  "settings-schema": "org.gnome.shell.extensions.impanel-with-osk"
 }
