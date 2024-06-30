@@ -1,7 +1,7 @@
 {
-  "name": "OSK for Fcitx JP",
+  "name": "Fcitx JP OSK",
   "description": "description",
-  "uuid": "osk-for-fcitx-jp@52hertz-reunion.site",
+  "uuid": "fcitx-jp-osk@52hertz-reunion.site",
   "shell-version": [
     "46"
   ]
