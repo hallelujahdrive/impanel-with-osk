@@ -2,7 +2,7 @@
   "name": "Fcitx JP OSK",
   "description": "description",
   "uuid": "fcitx-jp-osk@52hertz-reunion.site",
-  "shell-version": [
-    "46"
-  ]
+  "shell-version": ["46"],
+  "gettext-domain": "fcitx-jp-osk@52hertz-reunion.site",
+  "settings-schema": "org.gnome.shell.extensions.fcitx-jp-osk"
 }

@@ -1,7 +1,9 @@
 declare module "resource:///org/gnome/shell/extensions/extension.js" {
+  export * from "@girs/gnome-shell/extensions/extension";
+
   type CreateOverrideFunc<T> = (originalMethod: T) => T;
 
-  class InjectionManager {
+  export class InjectionManager {
     clear(): void;
 
     overrideMethod<T, U extends keyof T>(
@@ -14,10 +16,29 @@ declare module "resource:///org/gnome/shell/extensions/extension.js" {
   }
 }
 
+declare module "resource:///org/gnome/shell/misc/params.js" {
+  export * from "@girs/gnome-shell/misc/params";
+  /**
+   *
+   * @template T, U
+   * @param {T} param
+   * @param {U} default
+   * @param {boolean} [allowExtra]
+   * @returns {T & U}
+   */
+  export function parse<T, U>(
+    param: T = {},
+    defaults: U = {},
+    allowExtra = false
+  ): { [key in keyof T | keyof U]: NonNullable<T[key]> | NonNullable<U[key]> };
+}
+
 declare module "resource:///org/gnome/shell/ui/boxpointer.js" {
   import type * as BoxPointerBase from "@girs/gnome-shell/ui/boxpointer";
 
-  class BoxPointer extends BoxPointerBase.BoxPointer {
+  export * from "@girs/gnome-shell/ui/boxpointer";
+
+  export class BoxPointer extends BoxPointerBase.BoxPointer {
     close(
       animate: BoxPointerBase.PopupAnimation,
       onComplete?: () => void
@@ -33,7 +54,9 @@ declare module "resource:///org/gnome/shell/ui/status/keyboard.js" {
   import type IBus from "@girs/ibus-1.0";
   import type Meta from "@girs/meta-14";
 
-  class InputSourceManager extends Signals.EventEmitter {
+  export * from "@girs/gnome-shell/status/keyboard";
+
+  export class InputSourceManager extends Signals.EventEmitter {
     activeInputSource(
       is: InputSourceManagerBase.InputSource,
       inactive: boolean
@@ -83,7 +106,9 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
   import type Mtk from "@girs/mtk-14";
   import type St from "@girs/st-14";
 
-  interface FocusTracker extends Signals.EventEmitter {
+  export * from "@girs/gnome-shell/ui/keyboard";
+
+  export interface FocusTracker extends Signals.EventEmitter {
     get currentWindow(): Meta.Window;
 
     destroy(): void;
@@ -95,7 +120,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
     _setCurrentWindow(window: Meta.Window): void;
   }
 
-  interface KeyContainer extends St.Widget {
+  export interface KeyContainer extends St.Widget {
     mode: string;
     shiftKeys: unknown[];
 
@@ -106,7 +131,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
     getRatio(): [number, number];
   }
 
-  interface KeyboardController extends Signals.EventEmitter {
+  export interface KeyboardController extends Signals.EventEmitter {
     set oskCompletion(enabled: boolean);
 
     commit(str: string, modifiers: string[]): Promise<void>;
@@ -139,7 +164,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
     _previousWordPosition(text: string, cursor: number): number;
   }
 
-  class Keyboard extends St.BoxLayout {
+  export class Keyboard extends St.BoxLayout {
     _aspectContainer: KeyContainer | null;
     _contentHint: number;
     _currentLayout: Clutter.Actor | null;
@@ -265,7 +290,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
     _windowSlideAnimationComplete(window: Meta.Window, finalY: number): void;
   }
 
-  class KeyboardManager extends Signals.EventEmitter {
+  export class KeyboardManager extends Signals.EventEmitter {
     get keyboardActor();
 
     get visible();

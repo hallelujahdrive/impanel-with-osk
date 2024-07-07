@@ -1,8 +1,8 @@
-import type StBase from "gi://St";
+import "gi://St";
 
 declare module "@girs/st-14" {
   export namespace St {
-    interface Button extends StBase.Button {
+    interface Button {
       _extendedKeys: StBase.BoxLayout | null;
       extendedKey: string | null;
 

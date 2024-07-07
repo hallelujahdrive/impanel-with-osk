@@ -1,8 +1,8 @@
-import type ClutterBase from "gi://Clutter";
+import "gi://Clutter";
 
 declare module "@girs/clutter-14" {
   export namespace Clutter {
-    interface Stage extends ClutterBase.Stage {
+    interface Stage {
       connectObject(
         id: string,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>

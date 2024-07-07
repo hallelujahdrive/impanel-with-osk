@@ -5,17 +5,13 @@ import GObject from "gi://GObject";
 import Meta from "gi://Meta";
 import St from "gi://St";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
-import * as Keyboard from "resource:///org/gnome/shell/ui/keyboard.js";
+import * as KeyboardBase from "resource:///org/gnome/shell/ui/keyboard.js";
 import { InjectionManager } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import type { Key } from "./types/oskLayout.js";
+import type { IKimPanel } from "./types/kimpanel.js";
 
 const KEY_LONG_PRESS_TIME = 250 as const;
-
-const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
-const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
-const FCITX_INTERFACE_CONTROLLER = "org.fcitx.Fcitx.Controller1" as const;
-const KIMPANEL_INTERFACE_INPUTMETHOD = "org.kde.kimpanel.inputmethod" as const;
 
 const CustomKey = GObject.registerClass(
   {
@@ -40,7 +36,7 @@ const CustomKey = GObject.registerClass(
     private _touchPressSlot!: number | null;
     public keyButton!: St.Button | null;
     // end-remove
-    _init(
+    constructor(
       params: {
         label?: string;
         iconName?: string;
@@ -53,7 +49,7 @@ const CustomKey = GObject.registerClass(
         keyval: 0,
         ...params,
       };
-      super._init({ style_class: "key-container" });
+      super({ style_class: "key-container" });
 
       this._keyval =
         typeof keyval === "number" ? keyval : Number.parseInt(keyval, 16);
@@ -306,33 +302,19 @@ const CustomKey = GObject.registerClass(
   }
 );
 
-export const CustomKeyboard = GObject.registerClass(
-  class CustomKeyboard extends GObject.Object {
+export const Keyboard = GObject.registerClass(
+  class Keyboard extends GObject.Object {
     // begin-remove
-    private _conn: Gio.DBusConnection | null;
-    private _dbusSignal: number | null;
-    private _dir: Gio.File;
     private _injectionManager: InjectionManager | null;
     private _kanaActive: boolean;
     private _toggleIMKeySet: Set<typeof CustomKey.prototype> | null;
     // end-remove
 
-    constructor(dir: Gio.File) {
+    constructor(
+      private readonly kimpanel: IKimPanel,
+      private readonly _dir: Gio.File
+    ) {
       super();
-
-      this._dir = dir;
-
-      this._conn = Gio.bus_get_sync(Gio.BusType.SESSION, null);
-
-      this._dbusSignal = this._conn.signal_subscribe(
-        FCITX_BUS_NAME,
-        KIMPANEL_INTERFACE_INPUTMETHOD,
-        null,
-        "/kimpanel",
-        null,
-        Gio.DBusSignalFlags.NONE,
-        this._signalCallback.bind(this)
-      );
 
       this._injectionManager = new InjectionManager();
       this._toggleIMKeySet = new Set();
@@ -342,12 +324,6 @@ export const CustomKeyboard = GObject.registerClass(
     }
 
     destroy(): void {
-      if (this._dbusSignal != null) {
-        this._conn?.signal_unsubscribe(this._dbusSignal);
-        this._dbusSignal = null;
-      }
-      this._conn = null;
-
       this._injectionManager?.clear();
       this._injectionManager = null;
 
@@ -360,8 +336,31 @@ export const CustomKeyboard = GObject.registerClass(
       this._getModifiedLayouts()?._unregister();
       this._getDefaultLayouts()._register();
 
-      if (destroyed) Main.keyboard._keyboard = new Keyboard.Keyboard();
+      if (destroyed) Main.keyboard._keyboard = new KeyboardBase.Keyboard();
       Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
+    }
+
+    updateProperty(value: string): void {
+      if (this._toggleIMKeySet == null) return;
+
+      /**
+       * Supported IM
+       * - fcitx-anthy
+       * - fcitx-kkc
+       * - fcitx-mozc
+       * - fcitx-skk
+       */
+      const kanaActive =
+        /^\/Fcitx\/im:(?:Anthy:fcitx-anthy:ひらがな|Mozc:fcitx-mozc:全角かな|SKK:fcitx_skk:ひらがな|かな漢字:fcitx_kkc:ひらがな)/.test(
+          value
+        );
+
+      this._kanaActive = kanaActive;
+      for (const button of this._toggleIMKeySet.values()) {
+        button.setLatched(kanaActive);
+      }
+
+      return;
     }
 
     _getModifiedLayouts(): Gio.Resource | null {
@@ -383,7 +382,7 @@ export const CustomKeyboard = GObject.registerClass(
 
     _destroyKeyboard(): boolean {
       try {
-        (Main.keyboard.keyboardActor as Keyboard.Keyboard).destroy();
+        (Main.keyboard.keyboardActor as KeyboardBase.Keyboard).destroy();
         Main.keyboard._keyboard = null;
       } catch (e) {
         if (e instanceof TypeError) return false;
@@ -394,14 +393,14 @@ export const CustomKeyboard = GObject.registerClass(
     }
 
     _overrideAddRowKeys(
-      _originalMethod: typeof Keyboard.Keyboard.prototype._addRowKeys
-    ): typeof Keyboard.Keyboard.prototype._addRowKeys {
+      _originalMethod: typeof KeyboardBase.Keyboard.prototype._addRowKeys
+    ): typeof KeyboardBase.Keyboard.prototype._addRowKeys {
       const _this = this;
 
       return function (
-        this: Keyboard.Keyboard,
+        this: KeyboardBase.Keyboard,
         keys: Key[],
-        layout: Keyboard.KeyContainer,
+        layout: KeyboardBase.KeyContainer,
         emojiVisible: boolean
       ) {
         let accumulatedWidth = 0;
@@ -474,17 +473,7 @@ export const CustomKeyboard = GObject.registerClass(
                 this._keyboardController.toggleDelete(true);
                 this._keyboardController.toggleDelete(false);
               } else if (key.action === "toggleIM") {
-                _this._conn?.call(
-                  FCITX_BUS_NAME,
-                  FCITX_CONTROLLER_OBJECT_PATH,
-                  FCITX_INTERFACE_CONTROLLER,
-                  "Toggle",
-                  null,
-                  null,
-                  Gio.DBusCallFlags.NONE,
-                  -1,
-                  null
-                );
+                _this.kimpanel.toggleIM();
               } else if (!this._longPressed && key.action === "levelSwitch") {
                 if (key.level) this._setActiveLevel(key.level);
                 this._setLatched(
@@ -540,51 +529,13 @@ export const CustomKeyboard = GObject.registerClass(
       this._getModifiedLayouts()?._register();
 
       this._injectionManager?.overrideMethod(
-        Keyboard.Keyboard.prototype,
+        KeyboardBase.Keyboard.prototype,
         "_addRowKeys",
         this._overrideAddRowKeys.bind(this)
       );
 
-      if (destroyed) Main.keyboard._keyboard = new Keyboard.Keyboard();
+      if (destroyed) Main.keyboard._keyboard = new KeyboardBase.Keyboard();
       Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
-    }
-
-    _signalCallback(
-      _connection: Gio.DBusConnection,
-      _sender_name: string | null,
-      _object_path: string,
-      _iface: string,
-      signal: string,
-      params: unknown
-    ): void {
-      switch (signal) {
-        case "UpdateProperty": {
-          if (this._toggleIMKeySet == null) return;
-
-          const value = (params as GLib.Variant).deepUnpack<string>();
-
-          /**
-           * Supported IM
-           * - fcitx-anthy
-           * - fcitx-kkc
-           * - fcitx-mozc
-           * - fcitx-skk
-           */
-          const kanaActive =
-            /^\/Fcitx\/im:(?:Anthy:fcitx-anthy:ひらがな|Mozc:fcitx-mozc:全角かな|SKK:fcitx_skk:ひらがな|かな漢字:fcitx_kkc:ひらがな)/.test(
-              value
-            );
-
-          this._kanaActive = kanaActive;
-          for (const button of this._toggleIMKeySet.values()) {
-            button.setLatched(kanaActive);
-          }
-
-          return;
-        }
-        // default:
-        //   console.log(signal, (params as GLib.Variant).deepUnpack());
-      }
     }
   }
 );

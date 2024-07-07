@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
+    "lib": ["ESNext"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "sourceMap": false,
     "strict": true,
     "target": "ES2022",
-    "skipLibCheck": true,
-    "lib": ["ESNext"],
     "typeRoots": ["src/@types"]
   },
   "include": ["src"]

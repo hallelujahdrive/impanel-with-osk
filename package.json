@@ -16,8 +16,10 @@
   "description": "",
   "devDependencies": {
     "@biomejs/biome": "1.8.2",
-    "@girs/gjs": "^3.3.0",
+    "@girs/gjs": "^4.0.0-beta.5",
+    "@girs/glib-2.0": "^2.80.0-4.0.0-beta.5",
     "@girs/gnome-shell": "^46.0.0-beta8",
+    "@girs/gobject-2.0": "^2.80.0-4.0.0-beta.5",
     "@girs/ibus-1.0": "^1.5.11-3.3.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.6",
