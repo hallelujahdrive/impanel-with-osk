@@ -129,22 +129,28 @@
           },
           {
             "action": "emoji",
-            "iconName": "face-smile-symbolic",
-            "width": 1.5
+            "iconName": "face-smile-symbolic"
           },
           {
             "strings": [" "],
             "width": 4
           },
           {
+            "iconName": "arrow-left",
+            "keyval": "0xff51"
+          },
+
+          {
+            "iconName": "arrow-right",
+            "keyval": "0xff53"
+          },
+          {
             "action": "languageMenu",
-            "iconName": "keyboard-layout-symbolic",
-            "width": 1.5
+            "iconName": "keyboard-layout-filled-symbolic"
           },
           {
             "action": "hide",
-            "iconName": "keyboard-hide-symbolic",
-            "width": 2
+            "iconName": "keyboard-hide-symbolic"
           }
         ]
       ]

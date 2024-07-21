@@ -340,6 +340,17 @@ export const Keyboard = GObject.registerClass(
       Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
     }
 
+    setSuggestions(labels: string[], texts: string[]): void {
+      Main.keyboard.resetSuggestions();
+
+      for (let i = 0; i < labels.length; i++) {
+        Main.keyboard.addSuggestion(texts[i], () => {
+          this.kimpanel.selectCandidate(i);
+          Main.keyboard.resetSuggestions();
+        });
+      }
+    }
+
     updateProperty(value: string): void {
       if (this._toggleIMKeySet == null) return;
 
@@ -361,6 +372,10 @@ export const Keyboard = GObject.registerClass(
       }
 
       return;
+    }
+
+    visible(): boolean {
+      return Main.keyboard._keyboard?.visible ?? false;
     }
 
     _getModifiedLayouts(): Gio.Resource | null {
@@ -426,9 +441,10 @@ export const Keyboard = GObject.registerClass(
               label: key.label,
               iconName: key.iconName,
               keyval: key.keyval,
-            } as never,
-            strings as never
+            },
+            strings
           );
+
           if (key.keyval) {
             button.connect("keyval", (_actor, keyval) => {
               this._keyboardController.keyvalPress(keyval);
@@ -535,6 +551,7 @@ export const Keyboard = GObject.registerClass(
       );
 
       if (destroyed) Main.keyboard._keyboard = new KeyboardBase.Keyboard();
+
       Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
     }
   }

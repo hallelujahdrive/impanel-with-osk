@@ -1,6 +1,7 @@
 import Clutter from "gi://Clutter";
 import St from "gi://St";
 import GObject from "gi://GObject";
+import type Meta from "gi://Meta";
 import Mtk from "gi://Mtk";
 import Pango from "gi://Pango";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -227,9 +228,8 @@ export const InputPanel = GObject.registerClass(
     }
 
     updatePosition() {
-      // biome-ignore lint/style/useConst: <explanation>
-      let kimpanel = this.kimpanel;
-      if (kimpanel == null) return;
+      const kimpanel = this.kimpanel;
+      if (kimpanel == null || this.panel == null) return;
 
       let x = kimpanel.x;
       let y = kimpanel.y;
@@ -241,7 +241,8 @@ export const InputPanel = GObject.registerClass(
           const shellScale = St.ThemeContext.get_for_stage(
             global.stage
           ).scale_factor;
-          const window = global.display.focus_window.get_compositor_private();
+          const window =
+            global.display.focus_window.get_compositor_private<Meta.WindowActor>();
           if (window) {
             x = window.x + x * (shellScale / kimpanel.scale);
             y = window.y + y * (shellScale / kimpanel.scale);
@@ -285,9 +286,10 @@ export const InputPanel = GObject.registerClass(
 
       this.panel._arrowSide = this._arrowSide;
 
-      this.visible =
+      const visible =
         kimpanel.showAux || kimpanel.showPreedit || kimpanel.showLookupTable;
-      if (this.visible) {
+
+      if (visible) {
         this.show();
       } else {
         this.hide();

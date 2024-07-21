@@ -273,6 +273,8 @@ export const Kimpanel = GObject.registerClass(
           break;
         }
         case "ShowLookupTable": {
+          if (this.keyboard?.visible()) return;
+
           const [value] = param.deepUnpack<[boolean]>();
 
           if (this.showLookupTable !== value) changed = true;
@@ -280,6 +282,8 @@ export const Kimpanel = GObject.registerClass(
           break;
         }
         case "ShowAux": {
+          if (this.keyboard?.visible()) return;
+
           const [value] = param.deepUnpack<[boolean]>();
 
           if (this.showAux !== value) changed = true;
@@ -495,17 +499,33 @@ export const Kimpanel = GObject.registerClass(
       labels: string[],
       texts: string[],
       _attrs: string[],
-      _hasPrev: boolean,
-      _hasNext: boolean,
+      hasPrev: boolean,
+      hasNext: boolean,
       cursor: number,
       layout: number
     ) {
-      this.label = labels;
-      this.table = texts;
-      this.cursor = cursor;
-      this.layoutHint = layout;
-      this.updateInputPanel();
+      if (this.keyboard?.visible() && hasPrev) {
+        this.label.push(...labels);
+        this.table.push(...texts);
+        this.cursor = cursor;
+        this.layoutHint = layout;
+      } else {
+        this.label = labels;
+        this.table = texts;
+        this.cursor = cursor;
+        this.layoutHint = layout;
+      }
+
       this.inputpanel?.setVertical(this.isLookupTableVertical());
+      this.updateInputPanel();
+
+      if (this.keyboard?.visible()) {
+        if (hasNext) {
+          this._impl?.emit_signal("LookupTablePageDown", null);
+        } else {
+          this.keyboard?.setSuggestions(this.label, this.table);
+        }
+      }
     }
 
     LockXkbGroup(idx: number) {

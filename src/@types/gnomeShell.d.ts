@@ -39,6 +39,8 @@ declare module "resource:///org/gnome/shell/ui/boxpointer.js" {
   export * from "@girs/gnome-shell/ui/boxpointer";
 
   export class BoxPointer extends BoxPointerBase.BoxPointer {
+    public _arrowSide: St.Side;
+
     close(
       animate: BoxPointerBase.PopupAnimation,
       onComplete?: () => void
@@ -291,24 +293,42 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
   }
 
   export class KeyboardManager extends Signals.EventEmitter {
+    _keyboard: Keyboard | null;
+
+    _suggestions: Suggestions | null;
+
     get keyboardActor();
 
     get visible();
 
-    addSuggestion(text: string, callback);
+    addSuggestion(text: string, callback: () => void): void;
 
-    close();
+    close(): void;
 
     maybeHandleEvent(event: Clutter.Event);
 
     open(monitor: number);
 
-    resetSuggestions();
+    resetSuggestions(): void;
 
     setSuggestionsVisible(visible: boolean);
 
-    _lastDeviceIsTouchscreen();
+    _lastDeviceIsTouchscreen(): void;
 
-    _syncEnabled();
+    _syncEnabled(): void;
   }
+
+  class Suggestions extends St.Widget {
+    add(word: string): void;
+
+    clear(): void;
+
+    setVisible(visible: boolean);
+  }
+}
+
+declare module "resource:///org/gnome/shell/ui/main.js" {
+  import type { KeyboardManager } from "resource:///org/gnome/shell/ui/keyboard.js";
+
+  export const keyboard: KeyboardManager;
 }
