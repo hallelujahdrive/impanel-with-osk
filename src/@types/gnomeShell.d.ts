@@ -176,6 +176,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
     _longPressed: boolean;
     _modifierKeys: Record<string, Key[]>;
     _modifiers: string[];
+    _suggestions: Suggestions | null;
 
     get visible(): boolean;
 
@@ -294,8 +295,6 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
   export class KeyboardManager extends Signals.EventEmitter {
     _keyboard: Keyboard | null;
-
-    _suggestions: Suggestions | null;
 
     get keyboardActor();
 

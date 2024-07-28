@@ -85,6 +85,7 @@ export const Kimpanel = GObject.registerClass(
     private _impl: Gio.DBusExportedObject | null;
     private _impl2: Gio.DBusExportedObject | null;
     private _isDestroyed: boolean;
+    private _suggestionsManager: Lib.SuggestionsManager | null;
 
     public aux: string;
     public conn: Gio.DBusConnection | null;
@@ -448,6 +449,25 @@ export const Kimpanel = GObject.registerClass(
         "SelectCandidate",
         new GLib.Variant("(i)", [arg])
       );
+      this._suggestionsManager = null;
+      Main.keyboard.resetSuggestions();
+    }
+
+    selectCandidateText(arg: string): void {
+      const texts = this.table.slice(Math.floor(this.table.length / 9) * 9);
+      this._suggestionsManager = new Lib.SuggestionsManager(arg, texts);
+      this._selectCandidate();
+    }
+
+    _selectCandidate(): void {
+      if (this._suggestionsManager == null) return;
+
+      const index = this._suggestionsManager.getSuggestIndex();
+      if (index >= 0) {
+        this.selectCandidate(index);
+      } else {
+        this._impl?.emit_signal("LookupTablePageUp", null);
+      }
     }
 
     setRect(
@@ -504,22 +524,24 @@ export const Kimpanel = GObject.registerClass(
       cursor: number,
       layout: number
     ) {
-      if (this.keyboard?.visible() && hasPrev) {
+      if (this._suggestionsManager != null) {
+        this._suggestionsManager.setTexts(texts);
+      } else if (this.keyboard?.visible() && hasPrev) {
         this.label.push(...labels);
         this.table.push(...texts);
-        this.cursor = cursor;
-        this.layoutHint = layout;
       } else {
         this.label = labels;
         this.table = texts;
-        this.cursor = cursor;
-        this.layoutHint = layout;
       }
+      this.cursor = cursor;
+      this.layoutHint = layout;
 
       this.inputpanel?.setVertical(this.isLookupTableVertical());
       this.updateInputPanel();
 
-      if (this.keyboard?.visible()) {
+      if (this._suggestionsManager != null) {
+        this._selectCandidate();
+      } else if (this.keyboard?.visible()) {
         if (hasNext) {
           this._impl?.emit_signal("LookupTablePageDown", null);
         } else {

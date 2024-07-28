@@ -343,11 +343,20 @@ export const Keyboard = GObject.registerClass(
     setSuggestions(labels: string[], texts: string[]): void {
       Main.keyboard.resetSuggestions();
 
-      for (let i = 0; i < labels.length; i++) {
+      const containerWidth = Main.keyboard._keyboard?.width ?? 0;
+
+      for (let i = 0; i < texts.length; i++) {
         Main.keyboard.addSuggestion(texts[i], () => {
-          this.kimpanel.selectCandidate(i);
-          Main.keyboard.resetSuggestions();
+          this.kimpanel.selectCandidateText(texts[i]);
         });
+
+        const width = Main.keyboard._keyboard?._suggestions?.width ?? 0;
+        if (width > containerWidth) {
+          Main.keyboard._keyboard?._suggestions?.remove_child(
+            Main.keyboard._keyboard._suggestions.lastChild
+          );
+          break;
+        }
       }
     }
 
@@ -553,6 +562,10 @@ export const Keyboard = GObject.registerClass(
       if (destroyed) Main.keyboard._keyboard = new KeyboardBase.Keyboard();
 
       Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
+
+      Main.keyboard._keyboard?._suggestions?.set_x_align(
+        Clutter.ActorAlign.START
+      );
     }
   }
 );

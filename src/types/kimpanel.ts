@@ -18,6 +18,8 @@ export interface IKimPanel extends GObject.Object {
 
   selectCandidate(arg: number): void;
 
+  selectCandidateText(arg: string): void;
+
   toggleIM(): void;
 
   triggerProperty(arg: string): void;

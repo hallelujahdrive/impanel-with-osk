@@ -15,7 +15,7 @@ export const KimMenuItem = GObject.registerClass(
     public _menuItemActivateId: number;
     public _menuItemDestroyId: number;
     public label: St.Label;
-    // end-remove    
+    // end-remove
     constructor(
       text: string,
       iconName: string,
@@ -40,6 +40,22 @@ export const KimMenuItem = GObject.registerClass(
     }
   }
 );
+
+export class SuggestionsManager {
+  private _texts: string[];
+
+  constructor(private readonly suggestion: string, texts: string[]) {
+    this._texts = texts;
+  }
+
+  getSuggestIndex(): number {
+    return this._texts.findIndex((text) => text === this.suggestion);
+  }
+
+  setTexts(texts: string[]): void {
+    this._texts = texts;
+  }
+}
 
 export function parseProperty(str: string): MenuItemProperty {
   const p = str.split(":");
