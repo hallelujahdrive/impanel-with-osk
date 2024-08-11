@@ -1,4 +1,4 @@
-NAME=fcitx-jp-osk
+NAME=impanel-with-osk
 DOMAIN=52hertz-reunion.site
 
 .PHONY: all pack install clean
@@ -14,7 +14,7 @@ dist/extension.js dist/prefs.js dist/stylesheet.css: node_modules
 data/gnome-shell-osk-layouts.gresource: data/osk-layouts data/gnome-shell-osk-layouts.gresource.xml data/osk-layouts/us.json
 	cd data && glib-compile-resources gnome-shell-osk-layouts.gresource.xml --sourcedir=osk-layouts --target=gnome-shell-osk-layouts.gresource
 
-schemas/gschemas.compiled: schemas/org.gnome.shell.extensions.fcitx-jp-osk.gschema.xml
+schemas/gschemas.compiled: schemas/org.gnome.shell.extensions.impanel-with-osk.gschema.xml
 	glib-compile-schemas schemas/
 
 $(NAME).zip: dist/extension.js dist/prefs.js dist/stylesheet.css data/gnome-shell-osk-layouts.gresource schemas/gschemas.compiled

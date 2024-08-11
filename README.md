@@ -1,6 +1,6 @@
-# GNOME Shell Extension: Fcitx JP OSK
+# GNOME Shell Extension: IM Panel integrated with OSK
 
-Fcitx JP OSK is a GNOME Shell extension that adds new functionality to your GNOME desktop environment.
+IM Panel integrated with OSK is a GNOME Shell extension that adds new functionality to your GNOME desktop environment.
 
 ## Features
 
@@ -16,11 +16,11 @@ Fcitx JP OSK is a GNOME Shell extension that adds new functionality to your GNOM
 
 1. Clone or download the repository:
    ```bash
-   git clone https://github.com/hallelujahdrive/fcitx-jp-osk.git
+   git clone https://github.com/hallelujahdrive/impanel-with-osk.git
    ```
 1. Navigate to the extension directory:
    ```bash
-   cd fcitx-jp-osk
+   cd impanel-with-osk
    ```
 1. Build the extension and install it:
    ```bash

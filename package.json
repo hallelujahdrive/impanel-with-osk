@@ -1,5 +1,5 @@
 {
-  "name": "fcitx-jp-osk",
+  "name": "impanel-with-osk",
   "version": "1.0.0",
   "type": "module",
   "main": "extension.js",

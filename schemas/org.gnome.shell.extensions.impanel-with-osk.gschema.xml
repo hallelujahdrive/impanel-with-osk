@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <schemalist>
-  <schema path="/org/gnome/shell/extensions/fcitx-jp-osk/" id="org.gnome.shell.extensions.fcitx-jp-osk">
+  <schema path="/org/gnome/shell/extensions/impabel-with-osk/" id="org.gnome.shell.extensions.impanel-with-osk">
     <key type="b" name="vertical">
         <default>false</default>
         <summary>vertical candidate text</summary>

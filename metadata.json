@@ -1,8 +1,8 @@
 {
-  "name": "Fcitx JP OSK",
+  "name": "IM Panel integrated with OSK",
   "description": "description",
-  "uuid": "fcitx-jp-osk@52hertz-reunion.site",
+  "uuid": "impanel-with-osk@52hertz-reunion.site",
   "shell-version": ["46"],
-  "gettext-domain": "fcitx-jp-osk@52hertz-reunion.site",
-  "settings-schema": "org.gnome.shell.extensions.fcitx-jp-osk"
+  "gettext-domain": "impanel-with-osk@52hertz-reunion.site",
+  "settings-schema": "org.gnome.shell.extensions.impanel-with-osk"
 }
