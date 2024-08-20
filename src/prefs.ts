@@ -1,5 +1,4 @@
 import Adw from "gi://Adw";
-import GObject from "gi://GObject";
 import Gio from "gi://Gio";
 import Gtk from "gi://Gtk";
 import {
@@ -7,44 +6,43 @@ import {
 	gettext as _,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
-const KimpanelPrefsWidget = GObject.registerClass(
-	class KimpanelPrefsWidget extends Adw.PreferencesPage {
-		constructor(private readonly settings: Gio.Settings) {
-			super();
-			const miscGroup = new Adw.PreferencesGroup();
-			this.add(miscGroup);
+export default class IMPanelWithOSKExtensionPreferences extends ExtensionPreferences {
+	fillPreferencesWindow(window: Adw.PreferencesWindow) {
+		window._settings = this.getSettings(
+			"org.gnome.shell.extensions.impanel-with-osk",
+		);
 
-			const toggle = new Gtk.Switch({
-				action_name: "kimpanel.vertical-list",
-				valign: Gtk.Align.CENTER,
-			});
-			let row = new Adw.ActionRow({
-				activatable_widget: toggle,
-				title: _("Vertical List"),
-			});
-			this.settings.bind(
-				"vertical",
-				toggle,
-				"active",
-				Gio.SettingsBindFlags.DEFAULT,
-			);
-			row.add_suffix(toggle);
-			miscGroup.add(row);
+		const page = new Adw.PreferencesPage({});
 
-			const button = new Gtk.FontButton();
-			row = new Adw.ActionRow({
-				activatable_widget: button,
-				title: _("Font"),
-			});
-			this.settings.bind("font", button, "font", Gio.SettingsBindFlags.DEFAULT);
-			row.add_suffix(button);
-			miscGroup.add(row);
-		}
-	},
-);
+		const group = new Adw.PreferencesGroup();
+		page.add(group);
 
-export default class KimpanelExtensionPreferences extends ExtensionPreferences {
-	getPreferencesWidget() {
-		return new KimpanelPrefsWidget(this.getSettings());
+		const switchRow = new Adw.SwitchRow({
+			title: _("Vertical List"),
+		});
+
+		window._settings.bind(
+			"vertical",
+			switchRow,
+			"active",
+			Gio.SettingsBindFlags.DEFAULT,
+		);
+		group.add(switchRow);
+
+		const button = new Gtk.FontButton();
+		const fontRow = new Adw.ActionRow({
+			activatable_widget: button,
+			title: _("Font"),
+		});
+		window._settings.bind(
+			"font",
+			button,
+			"font",
+			Gio.SettingsBindFlags.DEFAULT,
+		);
+		fontRow.add_suffix(button);
+		group.add(fontRow);
+
+		window.add(page);
 	}
 }

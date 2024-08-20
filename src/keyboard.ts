@@ -56,10 +56,12 @@ const AllSuggestions = GObject.registerClass(
 		}
 
 		public destroy(): void {
-			if (this.gesture != null) this.remove_action(this.gesture);
 			if (this.boxLayout != null) this.remove_child(this.boxLayout);
-			this.gesture = null;
 			this.boxLayout = null;
+			if (this.gesture != null) this.remove_action(this.gesture);
+			this.gesture = null;
+			if (this.pressTimeoutId !== 0) GLib.Source.remove(this.pressTimeoutId);
+			this.pressTimeoutId = 0;
 
 			super.destroy();
 		}
