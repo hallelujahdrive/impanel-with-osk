@@ -4,10 +4,15 @@ import GObject from "gi://GObject";
 import Gio from "gi://Gio";
 import Meta from "gi://Meta";
 import St from "gi://St";
-import { InjectionManager } from "resource:///org/gnome/shell/extensions/extension.js";
+import {
+	InjectionManager,
+	gettext as _,
+} from "resource:///org/gnome/shell/extensions/extension.js";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as KeyboardBase from "resource:///org/gnome/shell/ui/keyboard.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+import * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keyboard.js";
 import type { IKimPanel } from "./types/kimpanel.js";
 import type { Key } from "./types/oskLayout.js";
 
@@ -163,10 +168,10 @@ const CustomKey = GObject.registerClass(
 	},
 	class CustomKey extends St.BoxLayout {
 		// begin-remove
+		public capturedPress!: boolean;
 		public keyButton!: St.Button | null;
 
 		private boxPointer!: BoxPointer.BoxPointer | null;
-		private capturedPress!: boolean;
 		private extendedKeyboard!: St.BoxLayout | null;
 		private extendedKeys!: string[];
 		private icon!: St.Icon;
@@ -280,6 +285,9 @@ const CustomKey = GObject.registerClass(
 		private hideSubkeys(): void {
 			if (this.boxPointer)
 				this.boxPointer?.close(BoxPointer.PopupAnimation.FULL);
+
+			this.keyButton?.remove_style_class_name("active");
+
 			global.stage.disconnectObject(this);
 			this.keyButton?.disconnectObject(this);
 			this.capturedPress = false;
@@ -369,8 +377,9 @@ const CustomKey = GObject.registerClass(
 				return Clutter.EVENT_PROPAGATE;
 
 			if (press) this.capturedPress = true;
-			else if (release && this.capturedPress) this.hideSubkeys();
-
+			else if (release && this.capturedPress) {
+				this.hideSubkeys();
+			}
 			return Clutter.EVENT_STOP;
 		}
 
@@ -461,6 +470,93 @@ const ExpandButton = GObject.registerClass(
 		}
 	},
 );
+
+class LanguageSelectionPopup extends PopupMenu.PopupMenu {
+	declare sourceActor: typeof CustomKey.prototype;
+
+	constructor(sourceActor: typeof CustomKey.prototype) {
+		super(sourceActor, 0.5, St.Side.BOTTOM);
+
+		const inputSourceManager = InputSourceManager.getInputSourceManager();
+		const inputSources = inputSourceManager.inputSources;
+
+		let item: PopupMenu.PopupBaseMenuItem;
+		for (const i in inputSources) {
+			const is = inputSources[i];
+
+			item = this.addAction(is.displayName, () => {
+				inputSourceManager.activateInputSource(is, true);
+			});
+			item.can_focus = false;
+			item.setOrnament(
+				is === inputSourceManager.currentSource
+					? PopupMenu.Ornament.DOT
+					: PopupMenu.Ornament.NO_DOT,
+			);
+		}
+
+		this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		item = this.addSettingsAction(
+			_("Keyboard Settings"),
+			"gnome-keyboard-panel.desktop",
+		);
+		item.can_focus = false;
+
+		console.log("SSSSSSSSSSSSSSSSSSSSSS", typeof sourceActor.connectObject);
+
+		sourceActor.connectObject(
+			"notify::mapped",
+			() => {
+				if (!sourceActor.is_mapped()) this.close(true);
+			},
+			this,
+		);
+	}
+
+	public _onCapturedEvent(_actor: Clutter.Actor, event: Clutter.Event) {
+		const type = event.type();
+		const press =
+			type === Clutter.EventType.BUTTON_PRESS ||
+			type === Clutter.EventType.TOUCH_BEGIN;
+		const release =
+			type === Clutter.EventType.BUTTON_RELEASE ||
+			type === Clutter.EventType.TOUCH_END;
+		const targetActor = global.stage.get_event_actor(event);
+
+		if (
+			targetActor &&
+			(targetActor === this.actor || this.actor.contains(targetActor))
+		)
+			return Clutter.EVENT_PROPAGATE;
+
+		if (press) this.sourceActor.capturedPress = true;
+		else if (release && this.sourceActor.capturedPress) {
+			this.close(true);
+		}
+		return Clutter.EVENT_STOP;
+	}
+
+	public close(animate: boolean) {
+		super.close(animate);
+		this.sourceActor.capturedPress = false;
+		global.stage.disconnectObject(this);
+	}
+
+	public destroy() {
+		global.stage.disconnectObject(this);
+		this.sourceActor.disconnectObject(this);
+		super.destroy();
+	}
+
+	public open(animate: boolean) {
+		super.open(animate);
+		global.stage.connectObject(
+			"captured-event",
+			this._onCapturedEvent.bind(this),
+			this,
+		);
+	}
+}
 
 export const Keyboard = GObject.registerClass(
 	class Keyboard extends GObject.Object {
@@ -741,7 +837,9 @@ export const Keyboard = GObject.registerClass(
 					}
 
 					if (key.action === "languageMenu") {
-						button.connect("long-press", () => this._popupLanguageMenu(button));
+						button.connect("long-press", () => {
+							this._popupLanguageMenu(button);
+						});
 
 						if (_this.kanaActive) button.setLatched(_this.kanaActive);
 						_this.toggleIMKeySet?.add(button);
@@ -761,6 +859,21 @@ export const Keyboard = GObject.registerClass(
 			};
 		}
 
+		private overridePopupLanguageMenu(
+			_originalMethod: typeof KeyboardBase.Keyboard.prototype._popupLanguageMenu,
+		): typeof KeyboardBase.Keyboard.prototype._popupLanguageMenu {
+			return function (
+				this: KeyboardBase.Keyboard,
+				keyActor: typeof CustomKey.prototype,
+			) {
+				if (this._languagePopup) this._languagePopup.destroy();
+
+				this._languagePopup = new LanguageSelectionPopup(keyActor);
+				Main.layoutManager.addTopChrome(this._languagePopup.actor);
+				this._languagePopup.open(true);
+			};
+		}
+
 		private setupKeyboard(): void {
 			Main.layoutManager.removeChrome(Main.layoutManager.keyboardBox);
 
@@ -773,6 +886,12 @@ export const Keyboard = GObject.registerClass(
 				KeyboardBase.Keyboard.prototype,
 				"_addRowKeys",
 				this.overrideAddRowKeys.bind(this),
+			);
+
+			this.injectionManager?.overrideMethod(
+				KeyboardBase.Keyboard.prototype,
+				"_popupLanguageMenu",
+				this.overridePopupLanguageMenu.bind(this),
 			);
 
 			if (destroyed) {
