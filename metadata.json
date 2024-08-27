@@ -1,5 +1,5 @@
 {
-  "description": "IM Panel Integrated with OSK is a GNOME Shell extension that improves the operation of input methods on touch screens by adding several features to the GNOME OnScreen Keyboard.\nThis extension based on [input-method-panel](https://extensions.gnome.org/extension/261/kimpanel/).",
+  "description": "IM Panel Integrated with OSK is a GNOME Shell extension that improves the operation of input methods on touch screens by adding several features to the GNOME OnScreen Keyboard.\nThis extension is based on [input-method-panel](https://extensions.gnome.org/extension/261/kimpanel/).",
   "gettext-domain": "impanel-with-osk@52hertz-reunion.site",
   "name": "IM Panel integrated with OSK",
   "settings-schema": "org.gnome.shell.extensions.impanel-with-osk",

@@ -59,6 +59,10 @@ declare module "resource:///org/gnome/shell/ui/status/keyboard.js" {
 	export * from "@girs/gnome-shell/status/keyboard";
 
 	export class InputSourceManager extends Signals.EventEmitter {
+		get currentSource(): InputSourceManagerBase.InputSource;
+
+		get inputSources(): { [key in number]: InputSourceManagerBase.InputSource };
+
 		_currentInputMethodSourceChanged(
 			newSource: InputSourceManagerBase.InputSource,
 		): void;
@@ -89,18 +93,21 @@ declare module "resource:///org/gnome/shell/ui/status/keyboard.js" {
 
 		_updateMruSources(): void;
 
-		activeInputSource(
+		activateInputSource(
 			is: InputSourceManagerBase.InputSource,
 			inactive: boolean,
 		);
 
 		reload(): void;
 	}
+
+	export function getInputSourceManager(): InputSourceManager;
 }
 
 declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	import type * as Signals from "@girs/gnome-shell/misc/signals";
 	import type * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keyboard.js";
+	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 	import type Clutter from "@girs/clutter-14";
 	import type Graphene from "@girs/graphene-1.0";
 	import type Meta from "@girs/meta-14";
@@ -170,6 +177,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		_contentHint: number;
 		_currentLayout: Clutter.Actor | null;
 		_keyboardController: KeyboardController;
+		_languagePopup: LanguageSelectionPopup | null;
 		_latched: boolean;
 		_layers: Record<number | string, unknown> | null;
 		_longPressed: boolean;
@@ -315,12 +323,41 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		setSuggestionsVisible(visible: boolean);
 	}
 
-	class Suggestions extends St.Widget {
+	class LanguageSelectionPopup extends PopupMenu.PanelMenu {
+		actor: St.Widget;
+
+		_onCapturedEvent(actor, event): boolean;
+
+		close(animate): void;
+
+		destroy(): void;
+
+		open(animate): void;
+	}
+
+	interface Suggestions extends St.Widget {
 		add(word: string): void;
 
 		clear(): void;
 
 		setVisible(visible: boolean);
+	}
+}
+
+declare module "resource:///org/gnome/shell/ui/popupMenu.js" {
+	import type * as _PopupMenuBase from "@girs/gnome-shell/ui/popupMenu";
+	export class PopupMenu<
+		S extends Signals.SignalMap<S> = _PopupMenuBase.PopupMenuBase.SignalMap,
+	> extends _PopupMenuBase.PopupMenu<S> {
+		addAction(
+			title: string,
+			callback: () => void,
+			icon?: Gio.Icon,
+		): _PopupMenuBase.PopupMenuItem;
+		addSettingsAction(
+			title: string,
+			desktopFile: string,
+		): _PopupMenuBase.PopupBaseMenuItem;
 	}
 }
 
