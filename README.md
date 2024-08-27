@@ -20,6 +20,11 @@ This extension is based on [gnome-shell-extension-kimpanel](https://github.com/w
 
 ## Installation
 
+### Install from GNOME Extensions Website
+
+1. Go to the [Extensions page](https://extensions.gnome.org/extension/7239/im-panel-integrated-with-osk/).
+1. Click the "On/Off" switch to install it.
+
 ### Manual Installation
 
 1. Clone or download the repository:

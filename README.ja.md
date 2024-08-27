@@ -19,6 +19,10 @@ IM Panel integrated with OSK は、GNOME OnScreen Keyboardにいくつかの機�
 
 ## Installation
 
+### GNOME Extensions Websiteからインストール
+1. [拡張機能のページ](https://extensions.gnome.org/extension/7239/im-panel-integrated-with-osk/)にアクセスします。
+1. 「On/Off」スイッチをクリックしてインストールします。
+
 ### 手動インストール
 
 1. リポジトリをクローンするか、ダウンロードする:
