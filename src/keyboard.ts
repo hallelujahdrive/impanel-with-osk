@@ -502,8 +502,6 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		);
 		item.can_focus = false;
 
-		console.log("SSSSSSSSSSSSSSSSSSSSSS", typeof sourceActor.connectObject);
-
 		sourceActor.connectObject(
 			"notify::mapped",
 			() => {
@@ -702,7 +700,9 @@ export const Keyboard = GObject.registerClass(
 
 		private destroyKeyboard(): boolean {
 			try {
-				(Main.keyboard.keyboardActor as KeyboardBase.Keyboard).destroy();
+				(
+					Main.keyboard.keyboardActor as KeyboardBase.Keyboard | null
+				)?.destroy();
 				Main.keyboard._keyboard = null;
 			} catch (e) {
 				if (e instanceof TypeError) return false;
@@ -906,6 +906,10 @@ export const Keyboard = GObject.registerClass(
 
 			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
 
+			console.log(
+				"KKKKKKKKKKKKKKK",
+				Main.keyboard._keyboard?._suggestions != null,
+			);
 			Main.keyboard._keyboard?._suggestions?.set_x_align(
 				Clutter.ActorAlign.START,
 			);
