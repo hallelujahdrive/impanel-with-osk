@@ -19,6 +19,7 @@
     "@biomejs/biome": "1.9.3",
     "@eslint/eslintrc": "^3.1.0",
     "@eslint/js": "^9.12.0",
+    "@girs/gio-2.0": "^2.82.0-4.0.0-beta.16",
     "@girs/gjs": "^4.0.0-beta.16",
     "@girs/glib-2.0": "^2.82.0-4.0.0-beta.16",
     "@girs/gnome-shell": "^46.0.2",

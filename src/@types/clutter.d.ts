@@ -1,6 +1,6 @@
-import "gi://Clutter";
+import "@girs/clutter-14";
 
-declare module "@girs/clutter-14" {
+declare module "@girs/clutter-14/clutter-14" {
 	export namespace Clutter {
 		interface Stage {
 			connectObject(
