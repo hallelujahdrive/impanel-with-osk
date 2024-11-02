@@ -31,14 +31,15 @@ const AllSuggestions = GObject.registerClass(
 				overlay_scrollbars: true,
 				reactive: true,
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
-				x_expand: true,
-				y_expand: true,
+				xExpand: true,
+				yExpand: true,
 			});
 
 			this.boxLayout = new St.BoxLayout({
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
 				xExpand: true,
+				yExpand: true,
 			});
 
 			this.gesture = new Clutter.GestureAction();
@@ -82,7 +83,9 @@ const AllSuggestions = GObject.registerClass(
 
 			for (const text of texts) {
 				const row = this.getRow();
-				const button = new St.Button({ label: text });
+				const button = new St.Button({
+					label: text,
+				});
 
 				const callback = () => {
 					this.kimpanel.selectCandidateText(text);
@@ -502,8 +505,6 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		);
 		item.can_focus = false;
 
-		console.log("SSSSSSSSSSSSSSSSSSSSSS", typeof sourceActor.connectObject);
-
 		sourceActor.connectObject(
 			"notify::mapped",
 			() => {
@@ -674,7 +675,10 @@ export const Keyboard = GObject.registerClass(
 				return Clutter.EVENT_STOP;
 			});
 
-			Main.keyboard._keyboard?._suggestions?.set_width(containerWidth);
+			Main.keyboard._keyboard._suggestions.set_width(containerWidth);
+			Main.keyboard._keyboard._suggestions.set_x_align(
+				Clutter.ActorAlign.START,
+			);
 		}
 
 		public updateProperty(value: string): void {
@@ -688,7 +692,7 @@ export const Keyboard = GObject.registerClass(
 			 * - fcitx-skk
 			 */
 			const kanaActive =
-				/^\/Fcitx\/im:(?:Anthy:fcitx-anthy:ひらがな|Mozc:fcitx-mozc:全角かな|SKK:fcitx_skk:ひらがな|かな漢字:fcitx_kkc:ひらがな)/.test(
+				/^\/Fcitx\/im:(?:Anthy:fcitx-anthy:ひらがな|Mozc:fcitx-mozc:全角かな|Mozc:fcitx_mozc_hiragana:全角かな|SKK:fcitx_skk:ひらがな|かな漢字:fcitx_kkc:ひらがな)/.test(
 					value,
 				);
 
@@ -702,7 +706,9 @@ export const Keyboard = GObject.registerClass(
 
 		private destroyKeyboard(): boolean {
 			try {
-				(Main.keyboard.keyboardActor as KeyboardBase.Keyboard).destroy();
+				(
+					Main.keyboard.keyboardActor as KeyboardBase.Keyboard | null
+				)?.destroy();
 				Main.keyboard._keyboard = null;
 			} catch (e) {
 				if (e instanceof TypeError) return false;

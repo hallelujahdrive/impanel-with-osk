@@ -4,7 +4,7 @@ import { Kimpanel } from "./kimpanel.js";
 
 import "./stylesheet.css";
 
-export default class PlainExampleExtension extends Extension {
+export default class IMPanelWithOSK extends Extension {
 	private kimpanel: typeof Kimpanel.prototype | null = null;
 	private settings: Gio.Settings | null = null;
 

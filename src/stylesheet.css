@@ -1,53 +1,55 @@
 .popup-menu-boxpointer.kimpanel-popup-boxpointer {
-  /* you may customize pointer box here */
+	/* you may customize pointer box here */
 }
 
 .popup-menu-content.kimpanel-popup-content {
-  /* you may customize pointer box here */
-  /* padding: 6px; */
+	/* you may customize pointer box here */
+	/* padding: 6px; */
 }
 
 .kimpanel-label {
-  font-family: sans;
-  font-weight: normal;
-  padding: 0.4em;
+	/* biome-ignore lint/a11y/useGenericFontNames: st font-family */
+	font-family: sans;
+	font-weight: normal;
+	padding: 0.4em;
 }
 
 .kimpanel-candidate-item {
-  cursor: pointer;
-  transition-duration: 0ms;
+	cursor: pointer;
+	transition-duration: 0ms;
 }
 
 .kimpanel-candidate-item:hover {
-  /* border-radius: 14px; */
-  /* background-color: rgba(200,200,200,0.33); */
+	/* border-radius: 14px; */
+	/* background-color: rgba(200,200,200,0.33); */
 }
 
 .kimpanel-candidate-item:active {
-  /* border-radius: 14px; */
-  /* background-color: rgba(200,200,200,0.33); */
+	/* border-radius: 14px; */
+	/* background-color: rgba(200,200,200,0.33); */
 }
 
 .kimpanel-candidate-item:active:hover {
-  /* border-radius: 14px; */
-  /* background-color: rgba(200,200,200,0.15); */
+	/* border-radius: 14px; */
+	/* background-color: rgba(200,200,200,0.15); */
 }
 
 .minwidth-zero {
-  min-width: 0;
+	min-width: 0;
 }
 
 .icon-disable {
-  color: rgba(150, 150, 150, 0.5);
+	color: rgba(150, 150, 150, 0.5);
 }
 
 .kimpanel-suggestions-expand {
-  StIcon {
-    icon-size: 1em;
-  }
+	StIcon {
+		/* biome-ignore lint/correctness/noUnknownProperty: st property */
+		icon-size: 1em;
+	}
 }
 
 .word-all-suggestions {
-  padding-bottom: 0;
-  padding-top: 0;
+	padding-bottom: 0;
+	padding-top: 0;
 }

@@ -1,6 +1,6 @@
-import "gi://St";
+import type StBase from "@girs/st-14";
 
-declare module "@girs/st-14" {
+declare module "@girs/st-14/st-14" {
 	export namespace St {
 		interface Widget {
 			connectObject(
