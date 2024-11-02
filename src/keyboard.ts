@@ -31,14 +31,15 @@ const AllSuggestions = GObject.registerClass(
 				overlay_scrollbars: true,
 				reactive: true,
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
-				x_expand: true,
-				y_expand: true,
+				xExpand: true,
+				yExpand: true,
 			});
 
 			this.boxLayout = new St.BoxLayout({
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
 				xExpand: true,
+				yExpand: true,
 			});
 
 			this.gesture = new Clutter.GestureAction();
@@ -82,7 +83,9 @@ const AllSuggestions = GObject.registerClass(
 
 			for (const text of texts) {
 				const row = this.getRow();
-				const button = new St.Button({ label: text });
+				const button = new St.Button({
+					label: text,
+				});
 
 				const callback = () => {
 					this.kimpanel.selectCandidateText(text);
@@ -672,7 +675,10 @@ export const Keyboard = GObject.registerClass(
 				return Clutter.EVENT_STOP;
 			});
 
-			Main.keyboard._keyboard?._suggestions?.set_width(containerWidth);
+			Main.keyboard._keyboard._suggestions.set_width(containerWidth);
+			Main.keyboard._keyboard._suggestions.set_x_align(
+				Clutter.ActorAlign.START,
+			);
 		}
 
 		public updateProperty(value: string): void {
@@ -906,10 +912,6 @@ export const Keyboard = GObject.registerClass(
 
 			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
 
-			console.log(
-				"KKKKKKKKKKKKKKK",
-				Main.keyboard._keyboard?._suggestions != null,
-			);
 			Main.keyboard._keyboard?._suggestions?.set_x_align(
 				Clutter.ActorAlign.START,
 			);
