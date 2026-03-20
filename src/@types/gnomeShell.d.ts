@@ -1,5 +1,3 @@
-export {}
-
 declare module "resource:///org/gnome/shell/extensions/extension.js" {
 	export * from "@girs/gnome-shell/extensions/extension";
 
@@ -154,32 +152,29 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
 		getCurrentGroup(): string;
 
-		keyvalPress(keyval: string): void;
+		keyvalPress(keyval: number): void;
 
-		keyvalRelease(keyval: string): void;
+		keyvalRelease(keyval: number): void;
 
 		set oskCompletion(enabled: boolean);
 
 		toggleDelete(enabled: boolean): void;
 	}
 
-	export interface KeyContainer extends St.Widget {
-		appendKey(key, width = 1, height = 1, leftOffset = 0): void;
-		appendRow(): void;
-
-		getRatio(): [number, number];
-
-		mode: string;
-
-		shiftKeys: unknown[];
-	}
-
-	interface Suggestions extends St.Widget {
-		add(word: string): void;
+	interface Suggestions extends St.BoxLayout {
+		add(word: string, callback: () => void): void;
+		add_child(child: unknown): void;
 
 		clear(): void;
+		get_child_at_index(index: number): Clutter.Actor | null;
+		get_children(): Clutter.Actor[];
+		lastChild: Clutter.Actor | null;
+		remove_child(child: unknown): void;
+		set_width(width: number): void;
+		set_x_align(align: Clutter.ActorAlign): void;
 
-		setVisible(visible: boolean);
+		setVisible(visible: boolean): void;
+		width: number;
 	}
 
 	class LanguageSelectionPopup extends PopupMenu.PanelMenu {
@@ -201,7 +196,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		_keyboardController: KeyboardController;
 		_languagePopup: LanguageSelectionPopup | null;
 		_latched: boolean;
-		_layers: null | Record<number | string, unknown>;
+		_layers: null | Record<number | string, KeyContainer>;
 		_longPressed: boolean;
 		_modifierKeys: Record<string, Key[]>;
 		_modifiers: string[];
@@ -292,7 +287,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
 		_updateLayoutFromHint(): void;
 
-		_updateLevelFromHints(): void;
+		_updateLevelFromHints(userInputHappened?: boolean): void;
 
 		_windowSlideAnimationComplete(window: Meta.Window, finalY: number): void;
 
@@ -347,10 +342,16 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 }
 
 declare module "resource:///org/gnome/shell/ui/popupMenu.js" {
+	import type St from "gi://St";
 	import type * as _PopupMenuBase from "@girs/gnome-shell/ui/popupMenu";
 	export class PopupMenu<
 		S extends Signals.SignalMap<S> = _PopupMenuBase.PopupMenuBase.SignalMap,
 	> extends _PopupMenuBase.PopupMenu<S> {
+		constructor(
+			sourceActor: unknown,
+			arrowAlignment: number,
+			arrowSide: St.Side,
+		);
 		addAction(
 			title: string,
 			callback: () => void,
@@ -360,6 +361,52 @@ declare module "resource:///org/gnome/shell/ui/popupMenu.js" {
 			title: string,
 			desktopFile: string,
 		): _PopupMenuBase.PopupBaseMenuItem;
+	}
+}
+
+declare module "resource:///org/gnome/shell/ui/keyboard.js" {
+	import type Clutter from "gi://Clutter";
+	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+	import type St from "gi://St";
+
+	interface Keyboard {
+		__kimpanelLanguagePopup: null | PopupMenu.PopupMenu;
+		_popupLanguageMenu(keyActor: unknown): void;
+		add_child(child: unknown): void;
+		destroy(): void;
+		width: number;
+	}
+
+	interface KeyContainer extends St.Widget {
+		_gridLayout: Clutter.GridLayout;
+		appendKey(key, width = 1, height = 1, leftOffset = 0): void;
+		appendRow(): void;
+		getRatio(): [number, number];
+		hide(): void;
+		mode: string;
+
+		shiftKeys: unknown[];
+
+		show(): void;
+
+		visible: boolean;
+	}
+
+	interface Suggestions extends St.BoxLayout {
+		add_child(child: unknown): void;
+		get_child_at_index(index: number): Clutter.Actor | null;
+		get_children(): Clutter.Actor[];
+		lastChild: Clutter.Actor | null;
+		remove_child(child: unknown): void;
+		set_width(width: number): void;
+		set_x_align(align: Clutter.ActorAlign): void;
+		width: number;
+	}
+}
+
+declare module "resource:///org/gnome/shell/ui/main.js" {
+	interface LayoutManager {
+		addTopChrome(actor: unknown): void;
 	}
 }
 

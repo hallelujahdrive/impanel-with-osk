@@ -42,12 +42,10 @@
 	color: rgba(150, 150, 150, 0.5);
 }
 
-.kimpanel-suggestions-expand {
-	/* biome-ignore lint/correctness/noUnknownTypeSelector: GNOME Shell uses StIcon */
-	StIcon {
-		/* biome-ignore lint/correctness/noUnknownProperty: GNOME Shell uses StIcon */
-		icon-size: 1em;
-	}
+/* biome-ignore lint/correctness/noUnknownTypeSelector: GNOME Shell uses StIcon */
+.kimpanel-suggestions-expand StIcon {
+	/* biome-ignore lint/correctness/noUnknownProperty: GNOME Shell uses StIcon */
+	icon-size: 1em;
 }
 
 .word-all-suggestions {

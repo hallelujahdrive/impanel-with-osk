@@ -307,14 +307,15 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		private addToShell(): void {
-			if (this.menu != null) Main.uiGroup.add_child(this.menu.actor);
+			if (this.menu != null)
+				Main.layoutManager.uiGroup.add_child(this.menu.actor);
 			this.menu?.actor.hide();
 
 			if (this.inputPanel?.panel != null)
 				Main.layoutManager.addChrome(this.inputPanel.panel, {});
 
 			if (this.inputPanel?.cursor != null)
-				Main.uiGroup.add_child(this.inputPanel.cursor);
+				Main.layoutManager.uiGroup.add_child(this.inputPanel.cursor);
 
 			if (this.indicator != null)
 				Main.panel.addToStatusArea("kimpanel", this.indicator);

@@ -8,7 +8,7 @@ export interface IKimPanel extends GObject.Object {
 	lookupPageUp(): void;
 	relative: boolean;
 	scale: number;
-	selectCandidate(arg: number): void;
+	selectCandidate(arg?: number): void;
 	selectCandidateText(arg: string): void;
 
 	showAux: boolean;

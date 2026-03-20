@@ -57,7 +57,7 @@ export const parseProperty = (str: string): MenuItemProperty => {
 export const createIcon = (name: string): Gio.Icon | undefined => {
 	if (!name) return undefined;
 
-	// biome-ignore lint/suspicious/noDoubleEquals: <explanation>
+	// biome-ignore lint/suspicious/noDoubleEquals: GIR API
 	if (name[0] == "/") {
 		return Gio.FileIcon.new(Gio.File.new_for_path(name));
 	}

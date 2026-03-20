@@ -296,7 +296,7 @@ export const InputPanel = GObject.registerClass(
 		}
 
 		private candidateClicked(
-			widget: St.Label & { candidate_index: number },
+			widget: St.Label & { candidate_index?: number },
 		): void {
 			this.kimpanel?.selectCandidate(widget.candidate_index);
 		}
