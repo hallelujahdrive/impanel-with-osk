@@ -2,10 +2,8 @@ import type Gio from "gi://Gio";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { Kimpanel } from "./kimpanel.js";
 
-import "./stylesheet.css";
-
 export default class IMPanelWithOSK extends Extension {
-	private kimpanel: typeof Kimpanel.prototype | null = null;
+	private kimpanel: null | typeof Kimpanel.prototype = null;
 	private settings: Gio.Settings | null = null;
 
 	public disable() {

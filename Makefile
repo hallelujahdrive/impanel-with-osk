@@ -6,10 +6,13 @@ DOMAIN=52hertz-reunion.site
 all: dist/extension.js dist/prefs.js dist/stylesheet.css data/gnome-shell-osk-layouts.gresource schemas/gschemas.compiled
 
 node_modules: package.json
-	npm ci
+	bun install
 
-dist/extension.js dist/prefs.js dist/stylesheet.css: node_modules
-	npm run build
+dist/extension.js dist/prefs.js: node_modules
+	bun run build
+
+dist/stylesheet.css: src/stylesheet.css
+	cp src/stylesheet.css dist/stylesheet.css
 
 data/gnome-shell-osk-layouts.gresource: data/osk-layouts data/gnome-shell-osk-layouts.gresource.xml data/osk-layouts/us.json
 	cd data && glib-compile-resources gnome-shell-osk-layouts.gresource.xml --sourcedir=osk-layouts --target=gnome-shell-osk-layouts.gresource

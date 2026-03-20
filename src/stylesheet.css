@@ -43,8 +43,9 @@
 }
 
 .kimpanel-suggestions-expand {
+	/* biome-ignore lint/correctness/noUnknownTypeSelector: GNOME Shell uses StIcon */
 	StIcon {
-		/* biome-ignore lint/correctness/noUnknownProperty: st property */
+		/* biome-ignore lint/correctness/noUnknownProperty: GNOME Shell uses StIcon */
 		icon-size: 1em;
 	}
 }

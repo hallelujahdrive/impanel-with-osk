@@ -1,3 +1,5 @@
+export {}
+
 declare module "resource:///org/gnome/shell/extensions/extension.js" {
 	export * from "@girs/gnome-shell/extensions/extension";
 
@@ -117,31 +119,18 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	export * from "@girs/gnome-shell/ui/keyboard";
 
 	export interface FocusTracker extends Signals.EventEmitter {
-		get currentWindow(): Meta.Window;
-
 		_setCurrentRect(rect: Graphene.Rect): void;
 
 		_setCurrentWindow(window: Meta.Window): void;
+
+		get currentWindow(): Meta.Window;
 
 		destroy(): void;
 
 		getCurrentRect(): Mtk.Rectangle;
 	}
 
-	export interface KeyContainer extends St.Widget {
-		mode: string;
-		shiftKeys: unknown[];
-
-		appendKey(key, width = 1, height = 1, leftOffset = 0): void;
-
-		appendRow(): void;
-
-		getRatio(): [number, number];
-	}
-
 	export interface KeyboardController extends Signals.EventEmitter {
-		set oskCompletion(enabled: boolean);
-
 		_forwardModifiers(modifies: string[], type: Clutter.EventType): void;
 
 		_getKeyvalsFromString(string: string): void;
@@ -169,7 +158,40 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
 		keyvalRelease(keyval: string): void;
 
+		set oskCompletion(enabled: boolean);
+
 		toggleDelete(enabled: boolean): void;
+	}
+
+	export interface KeyContainer extends St.Widget {
+		appendKey(key, width = 1, height = 1, leftOffset = 0): void;
+		appendRow(): void;
+
+		getRatio(): [number, number];
+
+		mode: string;
+
+		shiftKeys: unknown[];
+	}
+
+	interface Suggestions extends St.Widget {
+		add(word: string): void;
+
+		clear(): void;
+
+		setVisible(visible: boolean);
+	}
+
+	class LanguageSelectionPopup extends PopupMenu.PanelMenu {
+		actor: St.Widget;
+
+		_onCapturedEvent(actor, event): boolean;
+
+		close(animate): void;
+
+		destroy(): void;
+
+		open(animate): void;
 	}
 
 	export class Keyboard extends St.BoxLayout {
@@ -179,11 +201,11 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		_keyboardController: KeyboardController;
 		_languagePopup: LanguageSelectionPopup | null;
 		_latched: boolean;
-		_layers: Record<number | string, unknown> | null;
+		_layers: null | Record<number | string, unknown>;
 		_longPressed: boolean;
 		_modifierKeys: Record<string, Key[]>;
 		_modifiers: string[];
-		_suggestions: Suggestions | null;
+		_suggestions: null | Suggestions;
 
 		get visible(): boolean;
 
@@ -223,12 +245,12 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
 		_onGroupChanged(): void;
 
-		_onKeyFocusChanged(): void;
-
 		_onKeyboardStateChanged(
 			controller: KeyboardController,
 			state: Clutter.InputPanelState,
 		): void;
+
+		_onKeyFocusChanged(): void;
 
 		_onPurposeChanged(
 			_controller: KeyboardController,
@@ -321,26 +343,6 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		resetSuggestions(): void;
 
 		setSuggestionsVisible(visible: boolean);
-	}
-
-	class LanguageSelectionPopup extends PopupMenu.PanelMenu {
-		actor: St.Widget;
-
-		_onCapturedEvent(actor, event): boolean;
-
-		close(animate): void;
-
-		destroy(): void;
-
-		open(animate): void;
-	}
-
-	interface Suggestions extends St.Widget {
-		add(word: string): void;
-
-		clear(): void;
-
-		setVisible(visible: boolean);
 	}
 }
 

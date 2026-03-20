@@ -11,7 +11,7 @@ export class SuggestionsManager {
 	public locked: boolean;
 	public texts: string[];
 
-	private candidate: string | null = null;
+	private candidate: null | string = null;
 	private hasNext = false;
 	private status: Status = "default";
 

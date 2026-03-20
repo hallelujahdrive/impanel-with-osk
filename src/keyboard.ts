@@ -1,12 +1,12 @@
 import Clutter from "gi://Clutter";
+import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import GObject from "gi://GObject";
-import Gio from "gi://Gio";
 import Meta from "gi://Meta";
 import St from "gi://St";
 import {
-	InjectionManager,
 	gettext as _,
+	InjectionManager,
 } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as KeyboardBase from "resource:///org/gnome/shell/ui/keyboard.js";
@@ -21,7 +21,7 @@ const KEY_LONG_PRESS_TIME = 250 as const;
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
-		private boxLayout!: St.BoxLayout | null;
+		private boxLayout!: null | St.BoxLayout;
 		private gesture: Clutter.GestureAction | null;
 		private pressTimeoutId: number;
 		// end-remove
@@ -172,16 +172,28 @@ const CustomKey = GObject.registerClass(
 	class CustomKey extends St.BoxLayout {
 		// begin-remove
 		public capturedPress!: boolean;
-		public keyButton!: St.Button | null;
+		public keyButton!: null | St.Button;
 
+		get iconName() {
+			return this.icon.icon_name ?? "";
+		}
+		set iconName(value: string) {
+			this.icon.icon_name = value;
+		}
+		get subkeys() {
+			return this.boxPointer;
+		}
 		private boxPointer!: BoxPointer.BoxPointer | null;
-		private extendedKeyboard!: St.BoxLayout | null;
+		private extendedKeyboard!: null | St.BoxLayout;
 		private extendedKeys!: string[];
 		private icon!: St.Icon;
 		private keyval!: number;
-		private pressTimeoutId!: number;
 		private pressed!: boolean;
-		private touchPressSlot!: number | null;
+
+		private pressTimeoutId!: number;
+
+		private touchPressSlot!: null | number;
+
 		// end-remove
 		constructor(
 			params: {
@@ -192,7 +204,7 @@ const CustomKey = GObject.registerClass(
 			},
 			extendedKeys: string[] = [],
 		) {
-			const { label, iconName, commitString, keyval } = {
+			const { commitString, iconName, keyval, label } = {
 				keyval: 0,
 				...params,
 			};
@@ -212,18 +224,6 @@ const CustomKey = GObject.registerClass(
 			this.extendedKeyboard = null;
 			this.pressTimeoutId = 0;
 			this.capturedPress = false;
-		}
-
-		get iconName() {
-			return this.icon.icon_name ?? "";
-		}
-
-		get subkeys() {
-			return this.boxPointer;
-		}
-
-		set iconName(value: string) {
-			this.icon.icon_name = value;
 		}
 
 		public setLatched(latched: boolean) {
@@ -562,10 +562,10 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 export const Keyboard = GObject.registerClass(
 	class Keyboard extends GObject.Object {
 		// begin-remove
-		private allSuggestions: typeof AllSuggestions.prototype | null = null;
+		private allSuggestions: null | typeof AllSuggestions.prototype = null;
 		private injectionManager: InjectionManager | null;
 		private kanaActive: boolean;
-		private toggleIMKeySet: Set<typeof CustomKey.prototype> | null;
+		private toggleIMKeySet: null | Set<typeof CustomKey.prototype>;
 		// end-remove
 		constructor(
 			private readonly kimpanel: IKimPanel,

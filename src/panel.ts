@@ -29,15 +29,15 @@ const createLabel = (params: Partial<St.Label.ConstructorProps>): Label => {
 export const InputPanel = GObject.registerClass(
 	class InputPanel extends GObject.Object {
 		// begin-remove
-		public auxText: St.Label | null;
-		public cursor: St.Label | null;
+		public auxText: null | St.Label;
+		public cursor: null | St.Label;
 		public kimpanel: IKimPanel | null;
-		public layout: St.BoxLayout | null;
-		public lookupTableLayout: St.BoxLayout | null;
+		public layout: null | St.BoxLayout;
+		public lookupTableLayout: null | St.BoxLayout;
 		public panel: BoxPointer.BoxPointer | null;
-		public preeditText: St.Label | null;
+		public preeditText: null | St.Label;
 		public text_style: string;
-		public upperLayout: St.BoxLayout | null;
+		public upperLayout: null | St.BoxLayout;
 
 		private arrowSide: St.Side;
 		// end-remove

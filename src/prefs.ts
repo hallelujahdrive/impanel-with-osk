@@ -2,12 +2,12 @@ import Adw from "gi://Adw";
 import Gio from "gi://Gio";
 import Gtk from "gi://Gtk";
 import {
-	ExtensionPreferences,
 	gettext as _,
+	ExtensionPreferences,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 export default class IMPanelWithOSKExtensionPreferences extends ExtensionPreferences {
-	fillPreferencesWindow(window: Adw.PreferencesWindow) {
+	async fillPreferencesWindow(window: Adw.PreferencesWindow) {
 		window._settings = this.getSettings(
 			"org.gnome.shell.extensions.impanel-with-osk",
 		);
