@@ -1,6 +1,6 @@
 import Clutter from "gi://Clutter";
-import GObject from "gi://GObject";
 import Gio from "gi://Gio";
+import GObject from "gi://GObject";
 import Pango from "gi://Pango";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -57,7 +57,7 @@ export const parseProperty = (str: string): MenuItemProperty => {
 export const createIcon = (name: string): Gio.Icon | undefined => {
 	if (!name) return undefined;
 
-	// biome-ignore lint/suspicious/noDoubleEquals: <explanation>
+	// biome-ignore lint/suspicious/noDoubleEquals: GIR API
 	if (name[0] == "/") {
 		return Gio.FileIcon.new(Gio.File.new_for_path(name));
 	}

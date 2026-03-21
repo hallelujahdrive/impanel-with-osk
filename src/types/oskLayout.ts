@@ -1,3 +1,27 @@
+export type Key =
+	| KeyBase<
+			({ iconName: string } | { label: string }) &
+				(
+					| { action: "levelSwitch"; level: number | string }
+					| { action: "modifier"; keyval: string }
+					| { action: string & {} }
+					| { keyval: string }
+				)
+	  >
+	| KeyBase<{ strings: string[] }>;
+
+export interface Level {
+	level: string;
+	mode: string;
+	rows: Row[];
+}
+
+export interface OskLayout {
+	levels: Level[];
+	locale: string;
+	name: string;
+}
+
 type KeyBase<T> = T extends infer A
 	? Omit<
 			{
@@ -16,28 +40,4 @@ type KeyBase<T> = T extends infer A
 			A
 	: never;
 
-export type Key =
-	| KeyBase<
-			({ iconName: string } | { label: string }) &
-				(
-					| { action: "levelSwitch"; level: string | number }
-					| { action: "modifier"; keyval: string }
-					| { action: string & {} }
-					| { keyval: string }
-				)
-	  >
-	| KeyBase<{ strings: string[] }>;
-
 type Row = Key[];
-
-export interface OskLayout {
-	levels: Level[];
-	locale: string;
-	name: string;
-}
-
-export interface Level {
-	level: string;
-	mode: string;
-	rows: Row[];
-}

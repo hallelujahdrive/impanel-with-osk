@@ -1,12 +1,11 @@
 import Clutter from "gi://Clutter";
+import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import GObject from "gi://GObject";
-import Gio from "gi://Gio";
-import Meta from "gi://Meta";
 import St from "gi://St";
 import {
-	InjectionManager,
 	gettext as _,
+	InjectionManager,
 } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as KeyboardBase from "resource:///org/gnome/shell/ui/keyboard.js";
@@ -16,69 +15,139 @@ import * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keybo
 import type { IKimPanel } from "./types/kimpanel.js";
 import type { Key } from "./types/oskLayout.js";
 
-const KEY_LONG_PRESS_TIME = 250 as const;
+interface KeyLike extends St.BoxLayout {
+	keyButton: null | St.Button;
+	setLatched(latched: boolean): void;
+}
+
+/** The base padding of the keyboard. */
+const BASE_PADDING = 6 as const;
+
+/** If the vertical movement amount (px) exceeds this threshold on the candidate button, it is treated as a scroll (the tap is not confirmed). */
+const SUGGESTION_SCROLL_DRAG_THRESHOLD_PX = 16 as const;
+
+type KeyLikeConstructor = new (
+	params: {
+		commitString?: string;
+		iconName?: string;
+		keyval?: number | string;
+		label?: string;
+	},
+	extendedKeys?: string[],
+) => KeyLike;
+
+/**
+ * Get the width of the keyboard content.
+ * If the keyboard width is greater than 1, return the keyboard width.
+ * If the keyboard width is 0, return the keyboard box width.
+ * If the keyboard width is less than 1, return the maximum of the keyboard width and the keyboard box width.
+ */
+function oskKeyboardContentWidth(): number {
+	const keyboardWidth = Main.keyboard._keyboard?.width ?? 0;
+	const boxWidth = Main.layoutManager.keyboardBox.width;
+	if (keyboardWidth > 1) return keyboardWidth;
+	if (boxWidth > 1) return boxWidth;
+	return Math.max(keyboardWidth, boxWidth);
+}
 
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
-		private boxLayout!: St.BoxLayout | null;
-		private gesture: Clutter.GestureAction | null;
-		private pressTimeoutId: number;
+		private candidateContainer!: null | St.BoxLayout;
+		private keyboardBoxNotifyHeightId = 0;
+		private keyboardBoxNotifyWidthId = 0;
+		private lastScrollY: null | number = null;
+		private panGesture: Clutter.PanGesture | null = null;
+		private pressStartY: null | number = null;
+		private scrollDragging = false;
 		// end-remove
 		constructor(private readonly kimpanel: IKimPanel) {
 			super({
 				hscrollbarPolicy: St.PolicyType.NEVER,
-				overlay_scrollbars: true,
 				reactive: true,
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
+				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
-				yExpand: true,
+				y_expand: false,
 			});
 
-			this.boxLayout = new St.BoxLayout({
+			this.candidateContainer = new St.BoxLayout({
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
+				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
 				yExpand: true,
 			});
 
-			this.gesture = new Clutter.GestureAction();
+			this.set_child(this.candidateContainer);
 
-			this.gesture.connect(
-				"gesture-progress",
-				(action: Clutter.GestureAction) => {
-					const [, , dy] = action.get_motion_delta(0);
-					const adjustment = this.get_vadjustment();
-					adjustment.value -= dy;
-
-					return Clutter.EVENT_STOP;
+			const keyboardBox = Main.layoutManager.keyboardBox;
+			this.keyboardBoxNotifyWidthId = keyboardBox.connect(
+				"notify::width",
+				() => {
+					this.syncLayoutFromKeyboard();
 				},
 			);
 
-			this.pressTimeoutId = 0;
+			this.keyboardBoxNotifyHeightId = keyboardBox.connect(
+				"notify::height",
+				() => {
+					this.syncLayoutFromKeyboard();
+				},
+			);
 
-			this.add_child(this.boxLayout);
-			this.add_action(this.gesture);
+			this.panGesture = new Clutter.PanGesture();
+			this.panGesture.set_pan_axis(Clutter.PanAxis.Y);
+			(
+				this.panGesture as Clutter.PanGesture & { required_button: number }
+			).required_button = 0;
+			this.panGesture.set_begin_threshold(0);
+
+			this.panGesture.connect("pan-update", (action: Clutter.PanGesture) => {
+				const delta = action.get_delta();
+				const adjustment = this.get_vadjustment();
+				adjustment.value -= delta.get_y();
+			});
+
+			this.add_action(this.panGesture);
 		}
 
 		public destroy(): void {
-			if (this.boxLayout != null) this.remove_child(this.boxLayout);
-			this.boxLayout = null;
-			if (this.gesture != null) this.remove_action(this.gesture);
-			this.gesture = null;
-			if (this.pressTimeoutId !== 0) GLib.Source.remove(this.pressTimeoutId);
-			this.pressTimeoutId = 0;
+			if (this.keyboardBoxNotifyWidthId !== 0) {
+				Main.layoutManager.keyboardBox.disconnect(
+					this.keyboardBoxNotifyWidthId,
+				);
+				this.keyboardBoxNotifyWidthId = 0;
+			}
+			if (this.keyboardBoxNotifyHeightId !== 0) {
+				Main.layoutManager.keyboardBox.disconnect(
+					this.keyboardBoxNotifyHeightId,
+				);
+				this.keyboardBoxNotifyHeightId = 0;
+			}
+
+			if (this.candidateContainer != null) {
+				this.remove_child(this.candidateContainer);
+				this.candidateContainer.destroy();
+				this.candidateContainer = null;
+			}
+			this.resetSuggestionPointerState();
+
+			if (this.panGesture != null) {
+				this.remove_action(this.panGesture);
+				this.panGesture = null;
+			}
 
 			super.destroy();
 		}
 
 		public reset(): void {
-			this.boxLayout?.remove_all_children();
+			this.candidateContainer?.remove_all_children();
 			this.hide();
 		}
 
 		public set(texts: string[]): void {
-			this.boxLayout?.remove_all_children();
+			this.candidateContainer?.remove_all_children();
 			this.show();
 
 			for (const text of texts) {
@@ -91,24 +160,48 @@ const AllSuggestions = GObject.registerClass(
 					this.kimpanel.selectCandidateText(text);
 
 					Main.keyboard._keyboard?._aspectContainer?.show();
-					this.hide();
+					this.reset();
 				};
 
-				button.connect("button-press-event", () => {
-					this.buttonPress();
+				button.connect("button-press-event", (_actor, event: Clutter.Event) => {
+					const [, y] = event.get_coords();
+					this.suggestionPointerDown(y);
 					return Clutter.EVENT_PROPAGATE;
 				});
 
 				button.connect("button-release-event", () => {
-					this.buttonRelease(callback);
+					this.suggestionButtonRelease(callback);
 					return Clutter.EVENT_STOP;
 				});
 
+				button.connect("motion-event", (_actor, event: Clutter.Event) => {
+					if ((event.get_state() & Clutter.ModifierType.BUTTON1_MASK) === 0)
+						return Clutter.EVENT_PROPAGATE;
+
+					const [, y] = event.get_coords();
+					if (this.scrollDragging) {
+						this.applyScrollStepFromY(y);
+						return Clutter.EVENT_STOP;
+					}
+					this.maybeStartScrollFromButton(y);
+					return this.scrollDragging
+						? Clutter.EVENT_STOP
+						: Clutter.EVENT_PROPAGATE;
+				});
+
 				button.connect("touch-event", (_actor, event: Clutter.Event) => {
-					if (event.type() === Clutter.EventType.TOUCH_BEGIN) {
-						this.buttonPress();
-					} else if (event.type() === Clutter.EventType.TOUCH_END) {
-						this.buttonRelease(callback);
+					const type = event.type();
+					if (type === Clutter.EventType.TOUCH_BEGIN) {
+						const [, y] = event.get_coords();
+						this.suggestionPointerDown(y);
+					} else if (type === Clutter.EventType.TOUCH_UPDATE) {
+						const [, y] = event.get_coords();
+						if (this.scrollDragging) this.applyScrollStepFromY(y);
+						else this.maybeStartScrollFromButton(y);
+					} else if (type === Clutter.EventType.TOUCH_END) {
+						this.suggestionButtonRelease(callback);
+					} else if (type === Clutter.EventType.TOUCH_CANCEL) {
+						this.resetSuggestionPointerState();
 					}
 
 					return Clutter.EVENT_STOP;
@@ -116,345 +209,105 @@ const AllSuggestions = GObject.registerClass(
 
 				row.add_child(button);
 
-				if (row.width > (Main.keyboard._keyboard?.width ?? 0)) {
+				if (row.width > Main.layoutManager.keyboardBox.width) {
 					row.remove_child(button);
-
-					const newRow = new St.BoxLayout({ vertical: false });
+					// add a new row
+					const newRow = new St.BoxLayout({
+						vertical: false,
+					});
 					newRow.add_child(button);
-					this.boxLayout?.add_child(newRow);
+					this.candidateContainer?.add_child(newRow);
 				}
 			}
+
+			this.syncLayoutFromKeyboard();
+			const parent = this.get_parent() as Clutter.Actor | null;
+			parent?.queue_relayout();
+
+			GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+				if (!this.visible) return GLib.SOURCE_REMOVE;
+				this.syncLayoutFromKeyboard();
+				(this.get_parent() as Clutter.Actor | null)?.queue_relayout();
+				return GLib.SOURCE_REMOVE;
+			});
 		}
 
-		private buttonPress(): void {
-			this.pressTimeoutId = GLib.timeout_add(
-				GLib.PRIORITY_DEFAULT,
-				KEY_LONG_PRESS_TIME,
-				() => {
-					this.pressTimeoutId = 0;
-					return GLib.SOURCE_REMOVE;
-				},
-			);
-		}
-
-		private buttonRelease(callback: () => void): void {
-			if (this.pressTimeoutId !== 0) {
-				callback();
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
+		private applyScrollStepFromY(y: number): void {
+			if (this.lastScrollY == null) {
+				this.lastScrollY = y;
+				return;
 			}
+			const dy = y - this.lastScrollY;
+			this.lastScrollY = y;
+			const adjustment = this.get_vadjustment();
+			adjustment.value -= dy;
 		}
 
 		private getRow(): Clutter.Actor {
-			const row = this.boxLayout?.get_last_child();
+			const row = this.candidateContainer?.get_last_child();
 
 			if (row != null) return row;
 
-			const newRow = new St.BoxLayout({ vertical: false });
-
-			this.boxLayout?.add_child(newRow);
-
-			return newRow;
-		}
-	},
-);
-
-const CustomKey = GObject.registerClass(
-	{
-		Signals: {
-			commit: { param_types: [GObject.TYPE_STRING] },
-			keyval: { param_types: [GObject.TYPE_UINT] },
-			"long-press": {},
-			pressed: {},
-			released: {},
-		},
-	},
-	class CustomKey extends St.BoxLayout {
-		// begin-remove
-		public capturedPress!: boolean;
-		public keyButton!: St.Button | null;
-
-		private boxPointer!: BoxPointer.BoxPointer | null;
-		private extendedKeyboard!: St.BoxLayout | null;
-		private extendedKeys!: string[];
-		private icon!: St.Icon;
-		private keyval!: number;
-		private pressTimeoutId!: number;
-		private pressed!: boolean;
-		private touchPressSlot!: number | null;
-		// end-remove
-		constructor(
-			params: {
-				commitString?: string;
-				iconName?: string;
-				keyval?: number | string;
-				label?: string;
-			},
-			extendedKeys: string[] = [],
-		) {
-			const { label, iconName, commitString, keyval } = {
-				keyval: 0,
-				...params,
-			};
-			super({ style_class: "key-container" });
-
-			this.keyval =
-				typeof keyval === "number" ? keyval : Number.parseInt(keyval, 16);
-			this.keyButton = this.makeKey(commitString, label, iconName);
-
-			/* Add the key in a container, so keys can be padded without losing
-			 * logical proportions between those.
-			 */
-			this.add_child(this.keyButton);
-			this.connect("destroy", this.onDestroy.bind(this));
-
-			this.extendedKeys = extendedKeys;
-			this.extendedKeyboard = null;
-			this.pressTimeoutId = 0;
-			this.capturedPress = false;
-		}
-
-		get iconName() {
-			return this.icon.icon_name ?? "";
-		}
-
-		get subkeys() {
-			return this.boxPointer;
-		}
-
-		set iconName(value: string) {
-			this.icon.icon_name = value;
-		}
-
-		public setLatched(latched: boolean) {
-			if (latched) this.keyButton?.add_style_pseudo_class("latched");
-			else this.keyButton?.remove_style_pseudo_class("latched");
-		}
-
-		private cancel(): void {
-			if (this.pressTimeoutId !== 0) {
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
-			}
-			this.touchPressSlot = null;
-			this.keyButton?.set_hover(false);
-			this.keyButton?.fake_release();
-		}
-
-		private ensureExtendedKeysPopup(): void {
-			if (this.extendedKeys.length === 0) return;
-
-			if (this?.boxPointer) return;
-
-			const _boxPointer = new BoxPointer.BoxPointer(St.Side.BOTTOM);
-			this.boxPointer = _boxPointer;
-
-			_boxPointer.hide();
-			Main.layoutManager.addTopChrome(_boxPointer);
-			if (this.keyButton) _boxPointer.setPosition(this.keyButton, 0.5);
-
-			// Adds style to existing keyboard style to avoid repetition
-			_boxPointer.add_style_class_name("keyboard-subkeys");
-			this.getExtendedKeys();
-			if (this.keyButton) this.keyButton._extendedKeys = this.extendedKeyboard;
-		}
-
-		private getExtendedKeys(): void {
-			this.extendedKeyboard = new St.BoxLayout({
-				style_class: "key-container",
+			const newRow = new St.BoxLayout({
 				vertical: false,
 			});
 
-			for (const extendedKey of this.extendedKeys) {
-				const key = this.makeKey(extendedKey);
+			this.candidateContainer?.add_child(newRow);
 
-				key.extendedKey = extendedKey;
-				this.extendedKeyboard?.add_child(key);
-
-				if (this.keyButton) {
-					const keyButton = this.keyButton;
-					key.set_size(...keyButton.allocation.get_size());
-					keyButton.connect("notify::allocation", () =>
-						key.set_size(...keyButton.allocation.get_size()),
-					);
-				}
-			}
-			const _extendedKeyboard = this.extendedKeyboard;
-
-			if (_extendedKeyboard != null)
-				this.boxPointer?.bin.add_child(_extendedKeyboard);
+			return newRow;
 		}
 
-		private hideSubkeys(): void {
-			if (this.boxPointer)
-				this.boxPointer?.close(BoxPointer.PopupAnimation.FULL);
+		private maybeStartScrollFromButton(y: number): void {
+			if (this.pressStartY == null) return;
+			if (Math.abs(y - this.pressStartY) < SUGGESTION_SCROLL_DRAG_THRESHOLD_PX)
+				return;
 
-			this.keyButton?.remove_style_class_name("active");
-
-			global.stage.disconnectObject(this);
-			this.keyButton?.disconnectObject(this);
-			this.capturedPress = false;
+			const totalDy = y - this.pressStartY;
+			const adjustment = this.get_vadjustment();
+			adjustment.value -= totalDy;
+			this.scrollDragging = true;
+			this.lastScrollY = y;
+			this.pressStartY = null;
 		}
 
-		private makeKey(
-			commitString?: string,
-			label?: string,
-			icon?: string,
-		): St.Button {
-			const button = new St.Button({
-				style_class: "keyboard-key",
-				x_expand: true,
-			});
-
-			if (icon) {
-				const child = new St.Icon({ icon_name: icon });
-				button.set_child(child);
-				this.icon = child;
-			} else if (label) {
-				button.set_label(label);
-			} else if (commitString) {
-				button.set_label(commitString);
-			}
-
-			button.connect("button-press-event", () => {
-				this.press(button);
-				button.add_style_pseudo_class("active");
-				return Clutter.EVENT_STOP;
-			});
-			button.connect("button-release-event", () => {
-				this.release(button, commitString);
-				button.remove_style_pseudo_class("active");
-				return Clutter.EVENT_STOP;
-			});
-			button.connect("touch-event", (_actor, event: Clutter.Event) => {
-				// We only handle touch events here on wayland. On X11
-				// we do get emulated pointer events, which already works
-				// for single-touch cases. Besides, the X11 passive touch grab
-				// set up by Mutter will make us see first the touch events
-				// and later the pointer events, so it will look like two
-				// unrelated series of events, we want to avoid double handling
-				// in these cases.
-				if (!Meta.is_wayland_compositor()) return Clutter.EVENT_PROPAGATE;
-
-				const slot = event.get_event_sequence().get_slot();
-
-				if (
-					!this.touchPressSlot &&
-					event.type() === Clutter.EventType.TOUCH_BEGIN
-				) {
-					this.touchPressSlot = slot;
-					this.press(button);
-					button.add_style_pseudo_class("active");
-				} else if (event.type() === Clutter.EventType.TOUCH_END) {
-					if (!this.touchPressSlot || this.touchPressSlot === slot) {
-						this.release(button, commitString);
-						button.remove_style_pseudo_class("active");
-					}
-
-					if (this.touchPressSlot === slot) this.touchPressSlot = null;
-				}
-				return Clutter.EVENT_STOP;
-			});
-
-			return button;
+		private resetSuggestionPointerState(): void {
+			this.pressStartY = null;
+			this.scrollDragging = false;
+			this.lastScrollY = null;
 		}
 
-		private onCapturedEvent(
-			_actor: Clutter.Actor,
-			event: Clutter.Event,
-		): boolean {
-			const type = event.type();
-			const press =
-				type === Clutter.EventType.BUTTON_PRESS ||
-				type === Clutter.EventType.TOUCH_BEGIN;
-			const release =
-				type === Clutter.EventType.BUTTON_RELEASE ||
-				type === Clutter.EventType.TOUCH_END;
-			const targetActor = global.stage.get_event_actor(event);
-
-			if (
-				targetActor &&
-				(targetActor === this.boxPointer?.bin ||
-					this.boxPointer?.bin.contains(targetActor))
-			)
-				return Clutter.EVENT_PROPAGATE;
-
-			if (press) this.capturedPress = true;
-			else if (release && this.capturedPress) {
-				this.hideSubkeys();
-			}
-			return Clutter.EVENT_STOP;
+		private suggestionButtonRelease(callback: () => void): void {
+			if (!this.scrollDragging) callback();
+			this.resetSuggestionPointerState();
 		}
 
-		private onDestroy(): void {
-			if (this.boxPointer) {
-				this.boxPointer?.destroy();
-				this.boxPointer = null;
-			}
-
-			this.cancel();
+		private suggestionPointerDown(y: number): void {
+			this.pressStartY = y;
+			this.scrollDragging = false;
+			this.lastScrollY = null;
 		}
 
-		private press(button: St.Button): void {
-			if (button === this.keyButton) {
-				this.pressTimeoutId = GLib.timeout_add(
-					GLib.PRIORITY_DEFAULT,
-					KEY_LONG_PRESS_TIME,
-					() => {
-						this.pressTimeoutId = 0;
+		private syncLayoutFromKeyboard(): void {
+			const keyboard = Main.keyboard._keyboard;
+			if (keyboard == null) return;
 
-						this.emit("long-press");
-
-						if (this.extendedKeys.length > 0) {
-							this.touchPressSlot = null;
-							this.ensureExtendedKeysPopup();
-							this.keyButton?.set_hover(false);
-							this.keyButton?.fake_release();
-							this.showSubkeys();
-						}
-
-						return GLib.SOURCE_REMOVE;
-					},
-				);
+			const width = oskKeyboardContentWidth();
+			if (width > 0 && this.width !== width) {
+				this.set_width(width);
+				this.candidateContainer?.set_width(width);
 			}
 
-			this.emit("pressed");
-			this.pressed = true;
-		}
+			const suggestions = keyboard._suggestions;
+			if (suggestions == null) return;
 
-		private release(button: St.Button, commitString?: string): void {
-			if (this.pressTimeoutId !== 0) {
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
-			}
-
-			if (this.pressed) {
-				if (this.keyval && button === this.keyButton)
-					this.emit("keyval", this.keyval);
-				else if (commitString) this.emit("commit", commitString);
-				else console.error("Need keyval or commitString");
-			}
-
-			this.emit("released");
-			this.hideSubkeys();
-			this.pressed = false;
-		}
-
-		private showSubkeys(): void {
-			this.boxPointer?.open(BoxPointer.PopupAnimation.FULL);
-			global.stage.connectObject(
-				"captured-event",
-				this.onCapturedEvent.bind(this),
-				this,
+			const height = Math.max(
+				1,
+				keyboard.height - suggestions.height - BASE_PADDING * 2 * 2,
 			);
-			this.keyButton?.connectObject(
-				"notify::mapped",
-				() => {
-					if (!this.keyButton || !this.keyButton.is_mapped())
-						this.hideSubkeys();
-				},
-				this,
-			);
+			if (this.height !== height) {
+				this.set_height(height);
+				this.candidateContainer?.set_height(height);
+			}
 		}
 	},
 );
@@ -475,10 +328,15 @@ const ExpandButton = GObject.registerClass(
 );
 
 class LanguageSelectionPopup extends PopupMenu.PopupMenu {
-	declare sourceActor: typeof CustomKey.prototype;
+	private capturedPress: boolean;
+	private sourceMappedId: number;
+	private stageCaptureEventId: number;
 
-	constructor(sourceActor: typeof CustomKey.prototype) {
+	constructor(sourceActor: Clutter.Actor) {
 		super(sourceActor, 0.5, St.Side.BOTTOM);
+		this.capturedPress = false;
+		this.sourceMappedId = 0;
+		this.stageCaptureEventId = 0;
 
 		const inputSourceManager = InputSourceManager.getInputSourceManager();
 		const inputSources = inputSourceManager.inputSources;
@@ -505,13 +363,9 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		);
 		item.can_focus = false;
 
-		sourceActor.connectObject(
-			"notify::mapped",
-			() => {
-				if (!sourceActor.is_mapped()) this.close(true);
-			},
-			this,
-		);
+		this.sourceMappedId = sourceActor.connect("notify::mapped", () => {
+			if (!sourceActor.is_mapped()) this.close(BoxPointer.PopupAnimation.FULL);
+		});
 	}
 
 	public _onCapturedEvent(_actor: Clutter.Actor, event: Clutter.Event) {
@@ -530,31 +384,42 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		)
 			return Clutter.EVENT_PROPAGATE;
 
-		if (press) this.sourceActor.capturedPress = true;
-		else if (release && this.sourceActor.capturedPress) {
-			this.close(true);
+		if (press) this.capturedPress = true;
+		else if (release && this.capturedPress) {
+			this.close(BoxPointer.PopupAnimation.FULL);
 		}
 		return Clutter.EVENT_STOP;
 	}
 
-	public close(animate: boolean) {
+	public close(animate?: BoxPointer.PopupAnimation) {
 		super.close(animate);
-		this.sourceActor.capturedPress = false;
-		global.stage.disconnectObject(this);
+		this.capturedPress = false;
+		if (this.stageCaptureEventId !== 0) {
+			global.stage.disconnect(this.stageCaptureEventId);
+			this.stageCaptureEventId = 0;
+		}
 	}
 
 	public destroy() {
-		global.stage.disconnectObject(this);
-		this.sourceActor.disconnectObject(this);
+		if (this.stageCaptureEventId !== 0) {
+			global.stage.disconnect(this.stageCaptureEventId);
+			this.stageCaptureEventId = 0;
+		}
+		if (this.sourceMappedId !== 0) {
+			this.sourceActor.disconnect(this.sourceMappedId);
+			this.sourceMappedId = 0;
+		}
 		super.destroy();
 	}
 
-	public open(animate: boolean) {
+	public open(animate?: BoxPointer.PopupAnimation) {
 		super.open(animate);
-		global.stage.connectObject(
+		if (this.stageCaptureEventId !== 0) {
+			global.stage.disconnect(this.stageCaptureEventId);
+		}
+		this.stageCaptureEventId = global.stage.connect(
 			"captured-event",
 			this._onCapturedEvent.bind(this),
-			this,
 		);
 	}
 }
@@ -562,10 +427,12 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 export const Keyboard = GObject.registerClass(
 	class Keyboard extends GObject.Object {
 		// begin-remove
-		private allSuggestions: typeof AllSuggestions.prototype | null = null;
+		private allSuggestions: null | typeof AllSuggestions.prototype = null;
 		private injectionManager: InjectionManager | null;
 		private kanaActive: boolean;
-		private toggleIMKeySet: Set<typeof CustomKey.prototype> | null;
+		private keyboardVisibilityHooked = false;
+		private keyConstructor: KeyLikeConstructor | null = null;
+		private toggleIMKeySet: null | Set<KeyLike>;
 		// end-remove
 		constructor(
 			private readonly kimpanel: IKimPanel,
@@ -603,13 +470,24 @@ export const Keyboard = GObject.registerClass(
 		}
 
 		public setSuggestions(texts: string[]): void {
+			this.ensureOskKeyboardPatched();
 			Main.keyboard.resetSuggestions();
+			// reset the width of the suggestions to auto-size
 			Main.keyboard._keyboard?._suggestions?.set_width(-1);
 			Main.keyboard._keyboard?._aspectContainer?.show();
 			this.allSuggestions?.reset();
 
-			const containerWidth = Main.keyboard._keyboard?.width ?? 0;
+			const kb = Main.keyboard._keyboard;
+			(kb as unknown as Clutter.Actor | null)?.queue_relayout();
+			let containerWidth = oskKeyboardContentWidth();
+			if (containerWidth < 1 && kb != null) {
+				Main.layoutManager.keyboardBox.queue_relayout();
+				containerWidth = oskKeyboardContentWidth();
+			}
+			if (containerWidth < 1)
+				containerWidth = Math.max(Main.layoutManager.keyboardBox.width, 1);
 
+			// fill the suggestions with the texts
 			for (const text of texts) {
 				Main.keyboard.addSuggestion(text, () => {
 					this.kimpanel.selectCandidateText(text);
@@ -624,33 +502,45 @@ export const Keyboard = GObject.registerClass(
 				}
 			}
 
+			// set the width of the suggestions to the container width
+			Main.keyboard._keyboard?._suggestions?.set_width(containerWidth);
+
 			const suggestionsCount =
 				Main.keyboard._keyboard?._suggestions?.get_children().length ?? 0;
 
+			// if all the texts fit in the suggestions, return
 			if (suggestionsCount === texts.length) return;
 
+			const suggestions = Main.keyboard._keyboard?._suggestions;
+
+			// add a spacer to the suggestions
+			suggestions?.add_child(new St.Widget({ x_expand: true }));
+
 			const button = new ExpandButton();
+			suggestions?.add_child(button);
 
-			const spacer = new St.Widget({ x_expand: true });
-			Main.keyboard._keyboard?._suggestions?.add_child(spacer);
-			Main.keyboard._keyboard?._suggestions?.add_child(button);
+			if (suggestions == null) return;
 
-			if (Main.keyboard._keyboard?._suggestions == null) return;
-
-			while (Main.keyboard._keyboard._suggestions.width > containerWidth) {
-				const key = Main.keyboard._keyboard._suggestions.get_child_at_index(
-					Main.keyboard._keyboard._suggestions.get_children().length - 3,
+			// remove overflowed suggestions
+			while (suggestions.width > containerWidth) {
+				const key = suggestions.get_child_at_index(
+					suggestions.get_children().length - 3,
 				);
 				if (key != null) {
-					Main.keyboard._keyboard?._suggestions.remove_child(key);
+					suggestions.remove_child(key);
 				}
 			}
+			suggestions.set_width(containerWidth);
 
-			const _suggestions = texts.slice(
-				Main.keyboard._keyboard._suggestions.get_children().length - 2,
-			);
+			const _suggestions = texts.slice(suggestions.get_children().length - 2);
 
 			const callback = () => {
+				if (
+					Main.keyboard._keyboard?._aspectContainer == null ||
+					this.allSuggestions == null
+				)
+					return;
+
 				if (Main.keyboard._keyboard?._aspectContainer?.visible) {
 					Main.keyboard._keyboard?._aspectContainer?.hide();
 					this.allSuggestions?.set(_suggestions);
@@ -675,10 +565,8 @@ export const Keyboard = GObject.registerClass(
 				return Clutter.EVENT_STOP;
 			});
 
-			Main.keyboard._keyboard._suggestions.set_width(containerWidth);
-			Main.keyboard._keyboard._suggestions.set_x_align(
-				Clutter.ActorAlign.START,
-			);
+			// suggestions.set_width(containerWidth);
+			suggestions.set_x_align(Clutter.ActorAlign.START);
 		}
 
 		public updateProperty(value: string): void {
@@ -718,6 +606,47 @@ export const Keyboard = GObject.registerClass(
 			return true;
 		}
 
+		/**
+		 * Shell の KeyboardManager は OSK オフ時に Keyboard を destroy し、再表示で新インスタンスを
+		 * 作る。拡張が付けた allSuggestions / oskCompletion は古いインスタンスに残るため毎回合わせる。
+		 */
+		private ensureOskKeyboardPatched(): void {
+			const kb = Main.keyboard._keyboard;
+			if (kb == null) return;
+
+			if (kb._keyboardController != null) {
+				kb._keyboardController.oskCompletion = true;
+			}
+			kb._suggestions?.set_x_align(Clutter.ActorAlign.START);
+
+			let attached = false;
+			if (this.allSuggestions != null) {
+				try {
+					attached = this.allSuggestions.get_parent() === kb;
+				} catch {
+					attached = false;
+				}
+			}
+
+			if (attached) return;
+
+			if (this.allSuggestions != null) {
+				try {
+					this.allSuggestions.destroy();
+				} catch {
+					/* GObject が既に破棄済み */
+				}
+				this.allSuggestions = null;
+			}
+
+			this.allSuggestions = new AllSuggestions(this.kimpanel);
+			const kbActor = kb as unknown as Clutter.Actor;
+			kbActor.insert_child_at_index(this.allSuggestions, 1);
+			this.allSuggestions.hide();
+			kbActor.queue_relayout();
+			Main.layoutManager.keyboardBox.queue_relayout();
+		}
+
 		private getDefaultLayouts(): Gio.Resource {
 			return Gio.Resource.load(
 				"/usr/share/gnome-shell/gnome-shell-osk-layouts.gresource",
@@ -735,6 +664,15 @@ export const Keyboard = GObject.registerClass(
 				: Gio.Resource.load(modifiedLayoutsPath);
 		}
 
+		private hookKeyboardRegeneration(): void {
+			if (this.keyboardVisibilityHooked) return;
+			this.keyboardVisibilityHooked = true;
+			Main.keyboard.connect("visibility-changed", () => {
+				if (Main.keyboard.visible) this.ensureOskKeyboardPatched();
+				return undefined;
+			});
+		}
+
 		private overrideAddRowKeys(
 			_originalMethod: typeof KeyboardBase.Keyboard.prototype._addRowKeys,
 		): typeof KeyboardBase.Keyboard.prototype._addRowKeys {
@@ -746,6 +684,24 @@ export const Keyboard = GObject.registerClass(
 				layout: KeyboardBase.KeyContainer,
 				emojiVisible: boolean,
 			) {
+				// if the key constructor is null, call the original method
+				if (_this.keyConstructor == null) {
+					_originalMethod.call(this, [{ strings: [""] }], layout, emojiVisible);
+
+					_this.keyConstructor = (layout.firstChild?.constructor ??
+						null) as KeyLikeConstructor | null;
+
+					layout.remove_all_children();
+					layout._currentCol = 0;
+					layout._maxCols = 0;
+					layout.shiftKeys = [];
+				}
+
+				// Constructor type is not available in typings for the original key widget.
+				if (_this.keyConstructor == null) {
+					return;
+				}
+
 				let accumulatedWidth = 0;
 				for (const key of keys) {
 					const { strings } = key;
@@ -762,7 +718,7 @@ export const Keyboard = GObject.registerClass(
 						accumulatedWidth = 0;
 					}
 
-					const button = new CustomKey(
+					const button = new _this.keyConstructor(
 						{
 							commitString,
 							iconName: key.iconName,
@@ -772,35 +728,11 @@ export const Keyboard = GObject.registerClass(
 						strings,
 					);
 
-					if (key.keyval) {
-						button.connect("keyval", (_actor, keyval) => {
-							this._keyboardController.keyvalPress(keyval);
-							this._keyboardController.keyvalRelease(keyval);
-						});
-					}
-
-					if (key.action !== "modifier") {
-						button.connect("commit", (_actor, str) => {
-							this._keyboardController
-								.commit(str, this._modifiers)
-								.then(() => {
-									this._disableAllModifiers();
-									if (
-										layout.mode === "default" ||
-										(layout.mode === "latched" && !this._latched)
-									) {
-										if (this._contentHint !== 0) this._updateLevelFromHints();
-										else this._setActiveLevel("default");
-									}
-								})
-								.catch(console.error);
-						});
-					}
-
-					if (key.action != null) {
+					if (key.action) {
 						button.connect("released", () => {
 							if (key.action === "hide") {
 								this.close(true);
+								this._updateLevelFromHints(true);
 							} else if (key.action === "languageMenu") {
 								_this.kimpanel.toggleIM();
 							} else if (key.action === "emoji") {
@@ -810,6 +742,7 @@ export const Keyboard = GObject.registerClass(
 							} else if (key.action === "delete") {
 								this._keyboardController.toggleDelete(true);
 								this._keyboardController.toggleDelete(false);
+								this._updateLevelFromHints(true);
 							} else if (!this._longPressed && key.action === "levelSwitch") {
 								if (key.level) this._setActiveLevel(key.level);
 								this._setLatched(
@@ -819,6 +752,29 @@ export const Keyboard = GObject.registerClass(
 							}
 
 							this._longPressed = false;
+						});
+					} else if (key.keyval) {
+						button.connect("keyval", (_actor: unknown, keyval: number) => {
+							this._keyboardController.keyvalPress(keyval);
+							this._keyboardController.keyvalRelease(keyval);
+							this._updateLevelFromHints(true);
+						});
+					} else {
+						button.connect("commit", (_actor: unknown, str: string) => {
+							if (_this.kanaActive) {
+								this._keyboardController.keyvalPress(str.charCodeAt(0));
+								this._keyboardController.keyvalRelease(str.charCodeAt(0));
+								this._disableAllModifiers();
+								this._updateLevelFromHints(true);
+							} else {
+								this._keyboardController
+									.commit(str, this._modifiers)
+									.then(() => {
+										this._disableAllModifiers();
+										this._updateLevelFromHints(true);
+									})
+									.catch(console.error);
+							}
 						});
 					}
 
@@ -844,7 +800,7 @@ export const Keyboard = GObject.registerClass(
 
 					if (key.action === "languageMenu") {
 						button.connect("long-press", () => {
-							this._popupLanguageMenu(button);
+							if (button.keyButton) this._popupLanguageMenu(button.keyButton);
 						});
 
 						if (_this.kanaActive) button.setLatched(_this.kanaActive);
@@ -868,15 +824,15 @@ export const Keyboard = GObject.registerClass(
 		private overridePopupLanguageMenu(
 			_originalMethod: typeof KeyboardBase.Keyboard.prototype._popupLanguageMenu,
 		): typeof KeyboardBase.Keyboard.prototype._popupLanguageMenu {
-			return function (
-				this: KeyboardBase.Keyboard,
-				keyActor: typeof CustomKey.prototype,
-			) {
-				if (this._languagePopup) this._languagePopup.destroy();
+			return function (this: KeyboardBase.Keyboard, keyActor) {
+				if (!(keyActor instanceof Clutter.Actor)) return;
+				if (this.__kimpanelLanguagePopup)
+					this.__kimpanelLanguagePopup.destroy();
 
-				this._languagePopup = new LanguageSelectionPopup(keyActor);
-				Main.layoutManager.addTopChrome(this._languagePopup.actor);
-				this._languagePopup.open(true);
+				const popup = new LanguageSelectionPopup(keyActor);
+				this.__kimpanelLanguagePopup = popup;
+				Main.layoutManager.addTopChrome(popup.actor);
+				popup.open(BoxPointer.PopupAnimation.FULL);
 			};
 		}
 
@@ -902,19 +858,12 @@ export const Keyboard = GObject.registerClass(
 
 			if (destroyed) {
 				Main.keyboard._keyboard = new KeyboardBase.Keyboard();
-
-				this.allSuggestions = new AllSuggestions(this.kimpanel);
-
-				Main.keyboard._keyboard.add_child(this.allSuggestions);
-
-				this.allSuggestions.hide();
 			}
 
-			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
+			this.hookKeyboardRegeneration();
+			this.ensureOskKeyboardPatched();
 
-			Main.keyboard._keyboard?._suggestions?.set_x_align(
-				Clutter.ActorAlign.START,
-			);
+			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
 		}
 	},
 );

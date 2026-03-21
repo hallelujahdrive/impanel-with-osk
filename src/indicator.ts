@@ -7,10 +7,10 @@ import * as Params from "resource:///org/gnome/shell/misc/params.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import {
-	type KimMenuItem,
 	createIcon,
 	createMenuItem,
 	extractLabelString,
+	type KimMenuItem,
 	parseProperty,
 } from "./lib.js";
 import type { IKimPanel } from "./types/kimpanel.js";
@@ -106,7 +106,6 @@ export const KimIndicator = GObject.registerClass(
 			for (const p in this.propertySwitch) {
 				if (!(p in _properties) || _properties[p] == null) {
 					this.propertySwitch[p].destroy();
-					// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 					delete this.propertySwitch[p];
 				}
 			}

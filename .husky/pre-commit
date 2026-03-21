@@ -1,2 +1,2 @@
-npm run check
+bun run check
 git update-index --again

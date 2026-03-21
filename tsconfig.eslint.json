@@ -1,0 +1,4 @@
+{
+	"extends": "./tsconfig.json",
+	"include": ["data/**/*.json", "src", "eslint.config.js", "rolldown.config.ts"]
+}

@@ -5,9 +5,9 @@ declare module "@girs/clutter-14/clutter-14" {
 		interface Stage {
 			connectObject(
 				id: string,
-				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+				// biome-ignore lint/suspicious/noExplicitAny: GIR callback signature
 				callback: (...args: any[]) => any,
-				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+				// biome-ignore lint/suspicious/noExplicitAny: GIR this arg
 				arg: any,
 			): number;
 

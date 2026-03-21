@@ -1,6 +1,6 @@
+import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import GObject from "gi://GObject";
-import Gio from "gi://Gio";
 import Meta from "gi://Meta";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { KimIndicator } from "./indicator.js";
@@ -10,6 +10,9 @@ import { KimMenu } from "./menu.js";
 import { InputPanel } from "./panel.js";
 import { SuggestionsManager } from "./suggestions.js";
 import type { IKimPanel } from "./types/kimpanel.js";
+
+// biome-ignore lint/suspicious/noExplicitAny: GIR callback signature
+const EMPTY_VARIANT = null as unknown as GLib.Variant<any>;
 
 const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
 const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
@@ -90,9 +93,9 @@ export const Kimpanel = GObject.registerClass(
 		public fontSignal: number;
 		public h!: number;
 		public helper_owner_id: number;
-		public indicator: typeof KimIndicator.prototype | null;
-		public keyboard: typeof Keyboard.prototype | null;
-		public menu: typeof KimMenu.prototype | null;
+		public indicator: null | typeof KimIndicator.prototype;
+		public keyboard: null | typeof Keyboard.prototype;
+		public menu: null | typeof KimMenu.prototype;
 		public owner_id: number;
 		public pos!: number;
 		public preedit!: string;
@@ -111,9 +114,9 @@ export const Kimpanel = GObject.registerClass(
 		private helperImpl: Gio.DBusExportedObject | null;
 		private impl: Gio.DBusExportedObject | null;
 		private impl2: Gio.DBusExportedObject | null;
-		private inputPanel: typeof InputPanel.prototype | null;
+		private inputPanel: null | typeof InputPanel.prototype;
 		private isDestroyed: boolean;
-		private suggestionsManager: SuggestionsManager | null;
+		private suggestionsManager: null | SuggestionsManager;
 		// end-remove
 		constructor(settings: Gio.Settings, dir: Gio.File) {
 			super();
@@ -172,8 +175,74 @@ export const Kimpanel = GObject.registerClass(
 			);
 		}
 
+		public destroy(): void {
+			this.isDestroyed = true;
+			this.resetData();
+			this.updateInputPanel();
+			if (this.watch_id !== 0) {
+				Gio.bus_unwatch_name(this.watch_id);
+				this.watch_id = 0;
+				this.current_service = "";
+			}
+			this.settings?.disconnect(this.verticalSignal);
+			this.settings?.disconnect(this.fontSignal);
+			this.settings = null;
+			this.conn?.signal_unsubscribe(this.dbusSignal);
+			this.conn = null;
+			Gio.bus_unown_name(this.owner_id);
+			Gio.bus_unown_name(this.helper_owner_id);
+			this.impl?.unexport();
+			this.impl = null;
+			this.impl2?.unexport();
+			this.impl2 = null;
+			this.helperImpl?.unexport();
+			this.helperImpl = null;
+			this.suggestionsManager = null;
+			// Menu need to be destroyed before indicator.
+			this.menu?.destroy();
+			this.menu = null;
+			this.indicator?.destroy();
+			this.indicator = null;
+			this.inputPanel?.destroy();
+			this.inputPanel = null;
+			this.keyboard?.destroy();
+			this.keyboard = null;
+		}
+
+		public emit(signal: string): void {
+			this.impl?.emit_signal(signal, EMPTY_VARIANT);
+		}
+
+		public getTextStyle(): string {
+			return Lib.getTextStyle(this.settings);
+		}
+
+		public isLookupTableVertical(): boolean {
+			return this.suggestionsManager?.layoutHint === 0
+				? Lib.isLookupTableVertical(this.settings)
+				: this.suggestionsManager?.layoutHint === 1;
+		}
+
 		LockXkbGroup(idx: number) {
 			new Meta.Context().get_backend().lock_layout_group(idx);
+		}
+
+		public lookupPageDown(): void {
+			this.impl?.emit_signal("LookupTablePageDown", EMPTY_VARIANT);
+		}
+
+		public lookupPageUp(): void {
+			this.impl?.emit_signal("LookupTablePageUp", EMPTY_VARIANT);
+		}
+
+		public selectCandidate(arg: number): void {
+			this.impl?.emit_signal("SelectCandidate", new GLib.Variant("(i)", [arg]));
+			this.suggestionsManager?.reset();
+			Main.keyboard.resetSuggestions();
+		}
+
+		public selectCandidateText(arg: string): void {
+			this.suggestionsManager?.selectCandidate(arg);
 		}
 
 		SetLookupTable(
@@ -222,72 +291,6 @@ export const Kimpanel = GObject.registerClass(
 			this.setRect(x, y, w, h, false, 1);
 		}
 
-		public destroy(): void {
-			this.isDestroyed = true;
-			this.resetData();
-			this.updateInputPanel();
-			if (this.watch_id !== 0) {
-				Gio.bus_unwatch_name(this.watch_id);
-				this.watch_id = 0;
-				this.current_service = "";
-			}
-			this.settings?.disconnect(this.verticalSignal);
-			this.settings?.disconnect(this.fontSignal);
-			this.settings = null;
-			this.conn?.signal_unsubscribe(this.dbusSignal);
-			this.conn = null;
-			Gio.bus_unown_name(this.owner_id);
-			Gio.bus_unown_name(this.helper_owner_id);
-			this.impl?.unexport();
-			this.impl = null;
-			this.impl2?.unexport();
-			this.impl2 = null;
-			this.helperImpl?.unexport();
-			this.helperImpl = null;
-			this.suggestionsManager = null;
-			// Menu need to be destroyed before indicator.
-			this.menu?.destroy();
-			this.menu = null;
-			this.indicator?.destroy();
-			this.indicator = null;
-			this.inputPanel?.destroy();
-			this.inputPanel = null;
-			this.keyboard?.destroy();
-			this.keyboard = null;
-		}
-
-		public emit(signal: string): void {
-			this.impl?.emit_signal(signal, null);
-		}
-
-		public getTextStyle(): string {
-			return Lib.getTextStyle(this.settings);
-		}
-
-		public isLookupTableVertical(): boolean {
-			return this.suggestionsManager?.layoutHint === 0
-				? Lib.isLookupTableVertical(this.settings)
-				: this.suggestionsManager?.layoutHint === 1;
-		}
-
-		public lookupPageDown(): void {
-			this.impl?.emit_signal("LookupTablePageDown", null);
-		}
-
-		public lookupPageUp(): void {
-			this.impl?.emit_signal("LookupTablePageUp", null);
-		}
-
-		public selectCandidate(arg: number): void {
-			this.impl?.emit_signal("SelectCandidate", new GLib.Variant("(i)", [arg]));
-			this.suggestionsManager?.reset();
-			Main.keyboard.resetSuggestions();
-		}
-
-		public selectCandidateText(arg: string): void {
-			this.suggestionsManager?.selectCandidate(arg);
-		}
-
 		public toggleIM(): void {
 			this.conn?.call(
 				FCITX_BUS_NAME,
@@ -307,14 +310,15 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		private addToShell(): void {
-			if (this.menu != null) Main.uiGroup.add_child(this.menu.actor);
+			if (this.menu != null)
+				Main.layoutManager.uiGroup.add_child(this.menu.actor);
 			this.menu?.actor.hide();
 
 			if (this.inputPanel?.panel != null)
 				Main.layoutManager.addChrome(this.inputPanel.panel, {});
 
 			if (this.inputPanel?.cursor != null)
-				Main.uiGroup.add_child(this.inputPanel.cursor);
+				Main.layoutManager.uiGroup.add_child(this.inputPanel.cursor);
 
 			if (this.indicator != null)
 				Main.panel.addToStatusArea("kimpanel", this.indicator);
@@ -336,7 +340,7 @@ export const Kimpanel = GObject.registerClass(
 
 		private parseSignal(
 			_conn: Gio.DBusConnection,
-			sender: string | null,
+			sender: null | string,
 			_object: string,
 			_iface: string,
 			signal: string,
@@ -347,6 +351,14 @@ export const Kimpanel = GObject.registerClass(
 			}
 			let changed = false;
 			switch (signal) {
+				case "Enable": {
+					const [value] = param.deepUnpack<[boolean]>();
+
+					this.enabled = value;
+					if (this.enabled) this.indicator?.active();
+					else this.indicator?.deactive();
+					break;
+				}
 				case "ExecMenu": {
 					const [value] = param.deepUnpack<[string[]]>();
 
@@ -370,6 +382,55 @@ export const Kimpanel = GObject.registerClass(
 						);
 					}
 					this.indicator?.updateProperties(value);
+					break;
+				}
+				case "ShowAux": {
+					const [value] = param.deepUnpack<[boolean]>();
+
+					if (this.showAux !== value) changed = true;
+					this.showAux = value;
+					break;
+				}
+				case "ShowLookupTable": {
+					const [value] = param.deepUnpack<[boolean]>();
+
+					if (this.showLookupTable !== value) changed = true;
+					this.showLookupTable = value;
+					break;
+				}
+				case "ShowPreedit": {
+					const [value] = param.deepUnpack<[boolean]>();
+
+					if (this.showPreedit !== value) changed = true;
+					this.showPreedit = value;
+					break;
+				}
+				case "UpdateAux": {
+					const value = param.deepUnpack<[string, string]>();
+
+					if (this.aux !== value[0]) changed = true;
+					this.aux = value[0];
+					break;
+				}
+				case "UpdateLookupTableCursor": {
+					const [value] = param.deepUnpack<[number]>();
+
+					if (this.pos !== value) changed = true;
+					if (this.suggestionsManager) this.suggestionsManager.cursor = value;
+					break;
+				}
+				case "UpdatePreeditCaret": {
+					const [value] = (param as GLib.Variant).deepUnpack<[number]>();
+
+					if (this.pos !== value) changed = true;
+					this.pos = value;
+					break;
+				}
+				case "UpdatePreeditText": {
+					const value = param.deepUnpack<[string, string]>();
+
+					if (this.preedit !== value[0]) changed = true;
+					this.preedit = value[0];
 					break;
 				}
 				case "UpdateProperty": {
@@ -397,63 +458,6 @@ export const Kimpanel = GObject.registerClass(
 					this.h = 0;
 					break;
 				}
-				case "UpdatePreeditText": {
-					const value = param.deepUnpack<[string, string]>();
-
-					if (this.preedit !== value[0]) changed = true;
-					this.preedit = value[0];
-					break;
-				}
-				case "UpdateAux": {
-					const value = param.deepUnpack<[string, string]>();
-
-					if (this.aux !== value[0]) changed = true;
-					this.aux = value[0];
-					break;
-				}
-				case "UpdateLookupTableCursor": {
-					const [value] = param.deepUnpack<[number]>();
-
-					if (this.pos !== value) changed = true;
-					if (this.suggestionsManager) this.suggestionsManager.cursor = value;
-					break;
-				}
-				case "UpdatePreeditCaret": {
-					const [value] = (param as GLib.Variant).deepUnpack<[number]>();
-
-					if (this.pos !== value) changed = true;
-					this.pos = value;
-					break;
-				}
-				case "ShowPreedit": {
-					const [value] = param.deepUnpack<[boolean]>();
-
-					if (this.showPreedit !== value) changed = true;
-					this.showPreedit = value;
-					break;
-				}
-				case "ShowLookupTable": {
-					const [value] = param.deepUnpack<[boolean]>();
-
-					if (this.showLookupTable !== value) changed = true;
-					this.showLookupTable = value;
-					break;
-				}
-				case "ShowAux": {
-					const [value] = param.deepUnpack<[boolean]>();
-
-					if (this.showAux !== value) changed = true;
-					this.showAux = value;
-					break;
-				}
-				case "Enable": {
-					const [value] = param.deepUnpack<[boolean]>();
-
-					this.enabled = value;
-					if (this.enabled) this.indicator?.active();
-					else this.indicator?.deactive();
-					break;
-				}
 			}
 			if (changed) this.updateInputPanel();
 		}
@@ -462,8 +466,8 @@ export const Kimpanel = GObject.registerClass(
 			if (this.isDestroyed) {
 				return;
 			}
-			this.impl?.emit_signal("PanelCreated", null);
-			this.impl2?.emit_signal("PanelCreated2", null);
+			this.impl?.emit_signal("PanelCreated", EMPTY_VARIANT);
+			this.impl2?.emit_signal("PanelCreated2", EMPTY_VARIANT);
 		}
 
 		private resetData(): void {

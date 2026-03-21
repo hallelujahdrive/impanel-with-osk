@@ -1,15 +1,15 @@
 {
-  "compilerOptions": {
-    "lib": ["ESNext"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "./dist",
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "sourceMap": false,
-    "strict": true,
-    "target": "ES2022",
-    "typeRoots": ["src/@types"]
-  },
-  "include": ["src"]
+	"compilerOptions": {
+		"allowJs": true,
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"outDir": "./build",
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": false,
+		"strict": true,
+		"target": "ES2022",
+		"typeRoots": ["src/@types"]
+	},
+	"include": ["src"]
 }
