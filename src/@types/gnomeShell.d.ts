@@ -374,6 +374,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		_popupLanguageMenu(keyActor: unknown): void;
 		add_child(child: unknown): void;
 		destroy(): void;
+		height: number;
 		width: number;
 	}
 

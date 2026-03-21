@@ -34,51 +34,98 @@ type KeyLikeConstructor = new (
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
-		private boxLayout!: null | St.BoxLayout;
+		private candidateContainer!: null | St.BoxLayout;
+		private lastScrollY: null | number = null;
+		private longPressScroll = false;
+		private panGesture: Clutter.PanGesture | null = null;
 		private pressTimeoutId: number;
 		// end-remove
 		constructor(private readonly kimpanel: IKimPanel) {
 			super({
 				hscrollbarPolicy: St.PolicyType.NEVER,
-				overlay_scrollbars: true,
 				reactive: true,
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
+				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
 				yAlign: Clutter.ActorAlign.FILL,
 				yExpand: true,
 			});
 
-			this.boxLayout = new St.BoxLayout({
+			this.candidateContainer = new St.BoxLayout({
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
+				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
-				yExpand: false,
+				yExpand: true,
 			});
 
 			this.pressTimeoutId = 0;
 
-			this.add_child(this.boxLayout);
+			this.set_child(this.candidateContainer);
+
+			Main.layoutManager.keyboardBox.connect("notify::width", () => {
+				if (
+					Main.keyboard._keyboard == null ||
+					this.width === Main.keyboard._keyboard.width
+				)
+					return;
+
+				this?.set_width(Main.keyboard._keyboard.width);
+				this.candidateContainer?.set_width(Main.keyboard._keyboard.width);
+			});
+
+			Main.layoutManager.keyboardBox.connect("notify::height", () => {
+				if (Main.keyboard._keyboard?._suggestions == null) return;
+				const height =
+					Main.keyboard._keyboard.height -
+					Main.keyboard._keyboard._suggestions.width;
+
+				if (this.height === height) return;
+
+				this?.set_height(height);
+				this.candidateContainer?.set_height(height);
+			});
+
+			this.panGesture = new Clutter.PanGesture();
+			this.panGesture.set_pan_axis(Clutter.PanAxis.Y);
+			(
+				this.panGesture as Clutter.PanGesture & { required_button: number }
+			).required_button = 0;
+			this.panGesture.set_begin_threshold(0);
+
+			this.panGesture.connect("pan-update", (action: Clutter.PanGesture) => {
+				const delta = action.get_delta();
+				const adjustment = this.get_vadjustment();
+				adjustment.value -= delta.get_y();
+			});
+
+			this.add_action(this.panGesture);
 		}
 
 		public destroy(): void {
-			if (this.boxLayout != null) this.remove_child(this.boxLayout);
-			this.boxLayout = null;
-			if (this.pressTimeoutId !== 0) GLib.Source.remove(this.pressTimeoutId);
-			this.pressTimeoutId = 0;
+			if (this.candidateContainer != null) {
+				this?.remove_child(this.candidateContainer);
+				this.candidateContainer = null;
+			}
+			this.cancelPendingPress();
+			this.endLongPressScroll();
+
+			if (this.panGesture != null) {
+				this.remove_action(this.panGesture);
+				this.panGesture = null;
+			}
 
 			super.destroy();
 		}
 
 		public reset(): void {
-			this.boxLayout?.remove_all_children();
-			this.boxLayout?.set_height(-1);
+			this.candidateContainer?.remove_all_children();
 			this.hide();
 		}
 
 		public set(texts: string[]): void {
-			this.boxLayout?.remove_all_children();
+			this.candidateContainer?.remove_all_children();
 			this.show();
-			this.boxLayout?.set_height(-1);
 
 			for (const text of texts) {
 				const row = this.getRow();
@@ -103,34 +150,87 @@ const AllSuggestions = GObject.registerClass(
 					return Clutter.EVENT_STOP;
 				});
 
+				button.connect("motion-event", (_actor, event: Clutter.Event) => {
+					if (
+						!this.longPressScroll ||
+						(event.get_state() & Clutter.ModifierType.BUTTON1_MASK) === 0
+					)
+						return Clutter.EVENT_PROPAGATE;
+
+					const [, y] = event.get_coords();
+					this.applyScrollStepFromY(y);
+					return Clutter.EVENT_STOP;
+				});
+
 				button.connect("touch-event", (_actor, event: Clutter.Event) => {
-					if (event.type() === Clutter.EventType.TOUCH_BEGIN) {
+					const type = event.type();
+					if (type === Clutter.EventType.TOUCH_BEGIN) {
 						this.buttonPress();
-					} else if (event.type() === Clutter.EventType.TOUCH_END) {
+					} else if (
+						type === Clutter.EventType.TOUCH_UPDATE &&
+						this.longPressScroll
+					) {
+						const [, y] = event.get_coords();
+						this.applyScrollStepFromY(y);
+					} else if (type === Clutter.EventType.TOUCH_END) {
 						this.buttonRelease(callback);
+					} else if (type === Clutter.EventType.TOUCH_CANCEL) {
+						this.cancelPendingPress();
+						this.endLongPressScroll();
 					}
 
 					return Clutter.EVENT_STOP;
 				});
 
-				const [_, naturalWidth] = button.get_preferred_width(-1);
+				console.log(
+					"WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+					text,
+					this.width,
+					this.candidateContainer?.width,
+				);
 
-				if (row.width + naturalWidth <= (Main.keyboard._keyboard?.width ?? 0)) {
-					row.add_child(button);
-				} else if (texts.at(-1) !== text) {
+				row.add_child(button);
+
+				if (row.width > this.width) {
+					row.remove_child(button);
 					// add a new row
-					const newRow = new St.BoxLayout({ vertical: false });
-					this.boxLayout?.add_child(newRow);
+					const newRow = new St.BoxLayout({
+						vertical: false,
+					});
+					newRow.add_child(button);
+					this.candidateContainer?.add_child(newRow);
 				}
+
+				console.log(
+					"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+					this.height,
+					this.candidateContainer?.height,
+				);
 			}
 		}
 
+		private applyScrollStepFromY(y: number): void {
+			if (this.lastScrollY == null) {
+				this.lastScrollY = y;
+				return;
+			}
+			const dy = y - this.lastScrollY;
+			this.lastScrollY = y;
+			const adjustment = this.get_vadjustment();
+			adjustment.value -= dy;
+		}
+
 		private buttonPress(): void {
+			this.cancelPendingPress();
+			this.longPressScroll = false;
+			this.lastScrollY = null;
 			this.pressTimeoutId = GLib.timeout_add(
 				GLib.PRIORITY_DEFAULT,
 				KEY_LONG_PRESS_TIME,
 				() => {
 					this.pressTimeoutId = 0;
+					this.longPressScroll = true;
+					this.lastScrollY = null;
 					return GLib.SOURCE_REMOVE;
 				},
 			);
@@ -139,19 +239,33 @@ const AllSuggestions = GObject.registerClass(
 		private buttonRelease(callback: () => void): void {
 			if (this.pressTimeoutId !== 0) {
 				callback();
+				this.cancelPendingPress();
+			}
+			this.endLongPressScroll();
+		}
+
+		private cancelPendingPress(): void {
+			if (this.pressTimeoutId !== 0) {
 				GLib.source_remove(this.pressTimeoutId);
 				this.pressTimeoutId = 0;
 			}
 		}
 
+		private endLongPressScroll(): void {
+			this.longPressScroll = false;
+			this.lastScrollY = null;
+		}
+
 		private getRow(): Clutter.Actor {
-			const row = this.boxLayout?.get_last_child();
+			const row = this.candidateContainer?.get_last_child();
 
 			if (row != null) return row;
 
-			const newRow = new St.BoxLayout({ vertical: false });
+			const newRow = new St.BoxLayout({
+				vertical: false,
+			});
 
-			this.boxLayout?.add_child(newRow);
+			this.candidateContainer?.add_child(newRow);
 
 			return newRow;
 		}
