@@ -35,6 +35,8 @@ type KeyLikeConstructor = new (
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
+		/** 展開グリッド表示中（`_aspectContainer.visible` はシェル側とずれることがある） */
+		public isGridOpen = false;
 		private candidateContainer!: null | St.BoxLayout;
 		private keyboardBoxNotifyHeightId = 0;
 		private keyboardBoxNotifyWidthId = 0;
@@ -143,12 +145,14 @@ const AllSuggestions = GObject.registerClass(
 
 		public reset(): void {
 			this.candidateContainer?.remove_all_children();
+			this.isGridOpen = false;
 			this.hide();
 		}
 
 		public set(texts: string[]): void {
 			this.candidateContainer?.remove_all_children();
 			this.show();
+			this.isGridOpen = true;
 
 			for (const text of texts) {
 				const row = this.getRow();
@@ -491,7 +495,13 @@ export const Keyboard = GObject.registerClass(
 			const _suggestions = texts.slice(suggestions.get_children().length - 2);
 
 			const callback = () => {
-				if (Main.keyboard._keyboard?._aspectContainer?.visible) {
+				if (
+					Main.keyboard._keyboard?._aspectContainer == null ||
+					this.allSuggestions == null
+				)
+					return;
+
+				if (!this.allSuggestions?.isGridOpen) {
 					Main.keyboard._keyboard?._aspectContainer?.hide();
 					this.allSuggestions?.set(_suggestions);
 					button.expand(true);
@@ -760,7 +770,6 @@ export const Keyboard = GObject.registerClass(
 				Main.keyboard._keyboard = new KeyboardBase.Keyboard();
 
 				this.allSuggestions = new AllSuggestions(this.kimpanel);
-
 				Main.keyboard._keyboard.add_child(this.allSuggestions);
 
 				this.allSuggestions.hide();

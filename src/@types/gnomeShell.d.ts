@@ -369,13 +369,10 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 	import type St from "gi://St";
 
-	interface Keyboard {
+	interface Keyboard extends St.BoxLayout {
 		__kimpanelLanguagePopup: null | PopupMenu.PopupMenu;
-		_popupLanguageMenu(keyActor: unknown): void;
-		add_child(child: unknown): void;
+		_popupLanguageMenu(keyActor: Clutter.Actor): void;
 		destroy(): void;
-		height: number;
-		width: number;
 	}
 
 	interface KeyContainer extends St.Widget {
