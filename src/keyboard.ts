@@ -33,11 +33,20 @@ type KeyLikeConstructor = new (
 	extendedKeys?: string[],
 ) => KeyLike;
 
+/**
+ * 新規 Keyboard はレイアウト前に width が 0 のことがある。chrome の keyboardBox を参照する。
+ */
+function oskKeyboardContentWidth(): number {
+	const keyboardWidth = Main.keyboard._keyboard?.width ?? 0;
+	const boxWidth = Main.layoutManager.keyboardBox.width;
+	if (keyboardWidth > 1) return keyboardWidth;
+	if (boxWidth > 1) return boxWidth;
+	return Math.max(keyboardWidth, boxWidth);
+}
+
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
-		/** 展開グリッド表示中（`_aspectContainer.visible` はシェル側とずれることがある） */
-		public isGridOpen = false;
 		private candidateContainer!: null | St.BoxLayout;
 		private keyboardBoxNotifyHeightId = 0;
 		private keyboardBoxNotifyWidthId = 0;
@@ -128,14 +137,12 @@ const AllSuggestions = GObject.registerClass(
 
 		public reset(): void {
 			this.candidateContainer?.remove_all_children();
-			this.isGridOpen = false;
 			this.hide();
 		}
 
 		public set(texts: string[]): void {
 			this.candidateContainer?.remove_all_children();
 			this.show();
-			this.isGridOpen = true;
 
 			for (const text of texts) {
 				const row = this.getRow();
@@ -196,7 +203,7 @@ const AllSuggestions = GObject.registerClass(
 
 				row.add_child(button);
 
-				if (row.width > this.width) {
+				if (row.width > Main.layoutManager.keyboardBox.width) {
 					row.remove_child(button);
 					// add a new row
 					const newRow = new St.BoxLayout({
@@ -212,7 +219,7 @@ const AllSuggestions = GObject.registerClass(
 			parent?.queue_relayout();
 
 			GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-				if (!this.isGridOpen) return GLib.SOURCE_REMOVE;
+				if (!this.visible) return GLib.SOURCE_REMOVE;
 				this.syncLayoutFromKeyboard();
 				(this.get_parent() as Clutter.Actor | null)?.queue_relayout();
 				return GLib.SOURCE_REMOVE;
@@ -278,10 +285,10 @@ const AllSuggestions = GObject.registerClass(
 			const keyboard = Main.keyboard._keyboard;
 			if (keyboard == null) return;
 
-			const w = keyboard.width;
-			if (w > 0 && this.width !== w) {
-				this.set_width(w);
-				this.candidateContainer?.set_width(w);
+			const width = oskKeyboardContentWidth();
+			if (width > 0 && this.width !== width) {
+				this.set_width(width);
+				this.candidateContainer?.set_width(width);
 			}
 
 			const suggestions = keyboard._suggestions;
@@ -461,7 +468,15 @@ export const Keyboard = GObject.registerClass(
 			Main.keyboard._keyboard?._aspectContainer?.show();
 			this.allSuggestions?.reset();
 
-			const containerWidth = Main.keyboard._keyboard?.width ?? 0;
+			const kb = Main.keyboard._keyboard;
+			(kb as unknown as Clutter.Actor | null)?.queue_relayout();
+			let containerWidth = oskKeyboardContentWidth();
+			if (containerWidth < 1 && kb != null) {
+				Main.layoutManager.keyboardBox.queue_relayout();
+				containerWidth = oskKeyboardContentWidth();
+			}
+			if (containerWidth < 1)
+				containerWidth = Math.max(Main.layoutManager.keyboardBox.width, 1);
 
 			// fill the suggestions with the texts
 			for (const text of texts) {
@@ -517,7 +532,7 @@ export const Keyboard = GObject.registerClass(
 				)
 					return;
 
-				if (!this.allSuggestions?.isGridOpen) {
+				if (Main.keyboard._keyboard?._aspectContainer?.visible) {
 					Main.keyboard._keyboard?._aspectContainer?.hide();
 					this.allSuggestions?.set(_suggestions);
 					button.expand(true);
@@ -616,11 +631,11 @@ export const Keyboard = GObject.registerClass(
 			}
 
 			this.allSuggestions = new AllSuggestions(this.kimpanel);
-			(kb as unknown as Clutter.Actor).insert_child_at_index(
-				this.allSuggestions,
-				1,
-			);
+			const kbActor = kb as unknown as Clutter.Actor;
+			kbActor.insert_child_at_index(this.allSuggestions, 1);
 			this.allSuggestions.hide();
+			kbActor.queue_relayout();
+			Main.layoutManager.keyboardBox.queue_relayout();
 		}
 
 		private getDefaultLayouts(): Gio.Resource {
