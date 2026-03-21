@@ -1,12 +1,7 @@
-name: Build
+name: Lint
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,4 +10,6 @@ jobs:
       with:
         bun-version: "latest"
     - run: bun install
-    - run: bun run build
+    - run: bun lint
+    - run: bun format
+    - run: bun typecheck
