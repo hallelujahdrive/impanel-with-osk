@@ -1,5 +1,6 @@
 import Clutter from "gi://Clutter";
 import Gio from "gi://Gio";
+import GLib from "gi://GLib";
 import GObject from "gi://GObject";
 import St from "gi://St";
 import {
@@ -52,6 +53,7 @@ const AllSuggestions = GObject.registerClass(
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
 				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
+				y_expand: false,
 			});
 
 			this.candidateContainer = new St.BoxLayout({
@@ -64,37 +66,18 @@ const AllSuggestions = GObject.registerClass(
 
 			this.set_child(this.candidateContainer);
 
-			this.keyboardBoxNotifyWidthId = Main.layoutManager.keyboardBox.connect(
+			const keyboardBox = Main.layoutManager.keyboardBox;
+			this.keyboardBoxNotifyWidthId = keyboardBox.connect(
 				"notify::width",
 				() => {
-					if (
-						Main.keyboard._keyboard == null ||
-						this.width === Main.keyboard._keyboard.width
-					)
-						return;
-
-					this.set_width(Main.keyboard._keyboard.width);
-					this.candidateContainer?.set_width(Main.keyboard._keyboard.width);
+					this.syncLayoutFromKeyboard();
 				},
 			);
 
-			this.keyboardBoxNotifyHeightId = Main.layoutManager.keyboardBox.connect(
+			this.keyboardBoxNotifyHeightId = keyboardBox.connect(
 				"notify::height",
 				() => {
-					const keyboard = Main.keyboard._keyboard;
-					const suggestions = keyboard?._suggestions;
-					if (keyboard == null || suggestions == null) return;
-
-					const stripH = suggestions.height;
-					const height = Math.max(
-						1,
-						keyboard.height - stripH - 24, // $base_padding * 2 * 2
-					);
-
-					if (this.height === height) return;
-
-					this.set_height(height);
-					this.candidateContainer?.set_height(height);
+					this.syncLayoutFromKeyboard();
 				},
 			);
 
@@ -223,6 +206,17 @@ const AllSuggestions = GObject.registerClass(
 					this.candidateContainer?.add_child(newRow);
 				}
 			}
+
+			this.syncLayoutFromKeyboard();
+			const parent = this.get_parent() as Clutter.Actor | null;
+			parent?.queue_relayout();
+
+			GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+				if (!this.isGridOpen) return GLib.SOURCE_REMOVE;
+				this.syncLayoutFromKeyboard();
+				(this.get_parent() as Clutter.Actor | null)?.queue_relayout();
+				return GLib.SOURCE_REMOVE;
+			});
 		}
 
 		private applyScrollStepFromY(y: number): void {
@@ -278,6 +272,26 @@ const AllSuggestions = GObject.registerClass(
 			this.pressStartY = y;
 			this.scrollDragging = false;
 			this.lastScrollY = null;
+		}
+
+		private syncLayoutFromKeyboard(): void {
+			const keyboard = Main.keyboard._keyboard;
+			if (keyboard == null) return;
+
+			const w = keyboard.width;
+			if (w > 0 && this.width !== w) {
+				this.set_width(w);
+				this.candidateContainer?.set_width(w);
+			}
+
+			const suggestions = keyboard._suggestions;
+			if (suggestions == null) return;
+
+			const height = Math.max(1, keyboard.height - suggestions.height - 24); // $base_padding * 2 * 2
+			if (this.height !== height) {
+				this.set_height(height);
+				this.candidateContainer?.set_height(height);
+			}
 		}
 	},
 );
@@ -400,6 +414,7 @@ export const Keyboard = GObject.registerClass(
 		private allSuggestions: null | typeof AllSuggestions.prototype = null;
 		private injectionManager: InjectionManager | null;
 		private kanaActive: boolean;
+		private keyboardVisibilityHooked = false;
 		private keyConstructor: KeyLikeConstructor | null = null;
 		private toggleIMKeySet: null | Set<KeyLike>;
 		// end-remove
@@ -439,6 +454,7 @@ export const Keyboard = GObject.registerClass(
 		}
 
 		public setSuggestions(texts: string[]): void {
+			this.ensureOskKeyboardPatched();
 			Main.keyboard.resetSuggestions();
 			// reset the width of the suggestions to auto-size
 			Main.keyboard._keyboard?._suggestions?.set_width(-1);
@@ -566,6 +582,47 @@ export const Keyboard = GObject.registerClass(
 			return true;
 		}
 
+		/**
+		 * Shell の KeyboardManager は OSK オフ時に Keyboard を destroy し、再表示で新インスタンスを
+		 * 作る。拡張が付けた allSuggestions / oskCompletion は古いインスタンスに残るため毎回合わせる。
+		 */
+		private ensureOskKeyboardPatched(): void {
+			const kb = Main.keyboard._keyboard;
+			if (kb == null) return;
+
+			if (kb._keyboardController != null) {
+				kb._keyboardController.oskCompletion = true;
+			}
+			kb._suggestions?.set_x_align(Clutter.ActorAlign.START);
+
+			let attached = false;
+			if (this.allSuggestions != null) {
+				try {
+					attached = this.allSuggestions.get_parent() === kb;
+				} catch {
+					attached = false;
+				}
+			}
+
+			if (attached) return;
+
+			if (this.allSuggestions != null) {
+				try {
+					this.allSuggestions.destroy();
+				} catch {
+					/* GObject が既に破棄済み */
+				}
+				this.allSuggestions = null;
+			}
+
+			this.allSuggestions = new AllSuggestions(this.kimpanel);
+			(kb as unknown as Clutter.Actor).insert_child_at_index(
+				this.allSuggestions,
+				1,
+			);
+			this.allSuggestions.hide();
+		}
+
 		private getDefaultLayouts(): Gio.Resource {
 			return Gio.Resource.load(
 				"/usr/share/gnome-shell/gnome-shell-osk-layouts.gresource",
@@ -581,6 +638,15 @@ export const Keyboard = GObject.registerClass(
 			return modifiedLayoutsPath == null
 				? null
 				: Gio.Resource.load(modifiedLayoutsPath);
+		}
+
+		private hookKeyboardRegeneration(): void {
+			if (this.keyboardVisibilityHooked) return;
+			this.keyboardVisibilityHooked = true;
+			Main.keyboard.connect("visibility-changed", () => {
+				if (Main.keyboard.visible) this.ensureOskKeyboardPatched();
+				return undefined;
+			});
 		}
 
 		private overrideAddRowKeys(
@@ -768,22 +834,12 @@ export const Keyboard = GObject.registerClass(
 
 			if (destroyed) {
 				Main.keyboard._keyboard = new KeyboardBase.Keyboard();
-
-				this.allSuggestions = new AllSuggestions(this.kimpanel);
-				Main.keyboard._keyboard.add_child(this.allSuggestions);
-
-				this.allSuggestions.hide();
 			}
+
+			this.hookKeyboardRegeneration();
+			this.ensureOskKeyboardPatched();
 
 			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
-
-			Main.keyboard._keyboard?._suggestions?.set_x_align(
-				Clutter.ActorAlign.START,
-			);
-
-			if (Main.keyboard._keyboard?._keyboardController != null) {
-				Main.keyboard._keyboard._keyboardController.oskCompletion = true;
-			}
 		}
 	},
 );
