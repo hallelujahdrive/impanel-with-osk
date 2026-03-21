@@ -21,7 +21,6 @@ const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
 		private boxLayout!: null | St.BoxLayout;
-		// private gesture: Clutter.PanGesture | null;
 		private pressTimeoutId: number;
 		// end-remove
 		constructor(private readonly kimpanel: IKimPanel) {
@@ -31,6 +30,7 @@ const AllSuggestions = GObject.registerClass(
 				reactive: true,
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
 				xExpand: true,
+				yAlign: Clutter.ActorAlign.FILL,
 				yExpand: true,
 			});
 
@@ -38,32 +38,17 @@ const AllSuggestions = GObject.registerClass(
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
 				xExpand: true,
-				yExpand: true,
+				yExpand: false,
 			});
-
-			// this.gesture = new Clutter.PanGesture();
-
-			// this.gesture.connect(
-			// 	"gesture-progress",
-			// 	(_: Clutter.PanGesture, _dx: number, dy: number) => {
-			// 		const adjustment = this.get_vadjustment();
-			// 		adjustment.value -= dy;
-
-			// 		return Clutter.EVENT_STOP;
-			// 	},
-			// );
 
 			this.pressTimeoutId = 0;
 
 			this.add_child(this.boxLayout);
-			// this.add_action(this.gesture);
 		}
 
 		public destroy(): void {
 			if (this.boxLayout != null) this.remove_child(this.boxLayout);
 			this.boxLayout = null;
-			// if (this.gesture != null) this.remove_action(this.gesture);
-			// this.gesture = null;
 			if (this.pressTimeoutId !== 0) GLib.Source.remove(this.pressTimeoutId);
 			this.pressTimeoutId = 0;
 
@@ -72,6 +57,7 @@ const AllSuggestions = GObject.registerClass(
 
 		public reset(): void {
 			this.boxLayout?.remove_all_children();
+			this.boxLayout?.set_height(-1);
 			this.hide();
 		}
 
@@ -112,13 +98,13 @@ const AllSuggestions = GObject.registerClass(
 					return Clutter.EVENT_STOP;
 				});
 
-				row.add_child(button);
+				const [_, naturalWidth] = button.get_preferred_width(-1);
 
-				if (row.width > (Main.keyboard._keyboard?.width ?? 0)) {
-					row.remove_child(button);
-
+				if (row.width + naturalWidth <= (Main.keyboard._keyboard?.width ?? 0)) {
+					row.add_child(button);
+				} else if (texts.at(-1) !== text) {
+					// add a new row
 					const newRow = new St.BoxLayout({ vertical: false });
-					newRow.add_child(button);
 					this.boxLayout?.add_child(newRow);
 				}
 			}
@@ -618,12 +604,14 @@ export const Keyboard = GObject.registerClass(
 
 		public setSuggestions(texts: string[]): void {
 			Main.keyboard.resetSuggestions();
+			// reset the width of the suggestions to auto-size
 			Main.keyboard._keyboard?._suggestions?.set_width(-1);
 			Main.keyboard._keyboard?._aspectContainer?.show();
 			this.allSuggestions?.reset();
 
 			const containerWidth = Main.keyboard._keyboard?.width ?? 0;
 
+			// fill the suggestions with the texts
 			for (const text of texts) {
 				Main.keyboard.addSuggestion(text, () => {
 					this.kimpanel.selectCandidateText(text);
@@ -641,31 +629,31 @@ export const Keyboard = GObject.registerClass(
 			const suggestionsCount =
 				Main.keyboard._keyboard?._suggestions?.get_children().length ?? 0;
 
+			// if all the texts fit in the suggestions, return
 			if (suggestionsCount === texts.length) return;
 
-			const button = new ExpandButton();
-
-			const spacer = new St.Widget({ x_expand: true });
 			const suggestions = Main.keyboard._keyboard?._suggestions;
-			if (suggestions) {
-				Reflect.apply(suggestions.add_child, suggestions, [spacer]);
-				Reflect.apply(suggestions.add_child, suggestions, [button]);
-			}
 
-			if (Main.keyboard._keyboard?._suggestions == null) return;
+			// add a spacer to the suggestions
+			suggestions?.add_child(new St.Widget({ x_expand: true }));
 
-			while (Main.keyboard._keyboard._suggestions.width > containerWidth) {
-				const key = Main.keyboard._keyboard._suggestions.get_child_at_index(
-					Main.keyboard._keyboard._suggestions.get_children().length - 3,
+			const button = new ExpandButton();
+			suggestions?.add_child(button);
+
+			if (suggestions == null) return;
+
+			// remove overflowed suggestions
+			while (suggestions.width > containerWidth) {
+				const key = suggestions.get_child_at_index(
+					suggestions.get_children().length - 3,
 				);
 				if (key != null) {
-					Main.keyboard._keyboard?._suggestions.remove_child(key);
+					suggestions.remove_child(key);
 				}
 			}
+			suggestions.set_width(containerWidth);
 
-			const _suggestions = texts.slice(
-				Main.keyboard._keyboard._suggestions.get_children().length - 2,
-			);
+			const _suggestions = texts.slice(suggestions.get_children().length - 2);
 
 			const callback = () => {
 				if (Main.keyboard._keyboard?._aspectContainer?.visible) {
@@ -692,10 +680,8 @@ export const Keyboard = GObject.registerClass(
 				return Clutter.EVENT_STOP;
 			});
 
-			Main.keyboard._keyboard._suggestions.set_width(containerWidth);
-			Main.keyboard._keyboard._suggestions.set_x_align(
-				Clutter.ActorAlign.START,
-			);
+			// suggestions.set_width(containerWidth);
+			suggestions.set_x_align(Clutter.ActorAlign.START);
 		}
 
 		public updateProperty(value: string): void {

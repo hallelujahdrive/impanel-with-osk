@@ -1,6 +1,7 @@
 import Clutter from "gi://Clutter";
 import St from "gi://St";
 import * as Params from "resource:///org/gnome/shell/misc/params.js";
+import { PopupAnimation } from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import * as Lib from "./lib.js";
@@ -68,7 +69,7 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			this.addPropertyItem(_property);
 		}
 		if (properties.length > 0) {
-			this.open(true);
+			this.open(PopupAnimation.FULL);
 		}
 	}
 
@@ -123,11 +124,11 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			if (activeMenuContains) {
 				return false;
 			}
-			this.close(false);
+			this.close(PopupAnimation.NONE);
 			return true;
 		}
 		if (eventType === Clutter.EventType.BUTTON_PRESS && !activeMenuContains) {
-			this.close(false);
+			this.close(PopupAnimation.NONE);
 			return true;
 		}
 		return false;
@@ -147,10 +148,10 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			if (this.actor.contains(focus)) return;
 		}
 
-		this.close(false);
+		this.close(PopupAnimation.NONE);
 	}
 
-	private onOpenStateChanged(_menu, open: boolean) {
+	private onOpenStateChanged(_menu: unknown, open: boolean): undefined {
 		if (open) {
 			if (!this.grabbed) this.grab();
 		} else {
@@ -173,7 +174,7 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			return true;
 		}
 		if (symbol === Clutter.KEY_Escape && this.isOpen) {
-			this.close(false);
+			this.close(PopupAnimation.NONE);
 			return true;
 		}
 		if (symbol === Clutter.KEY_Down) {

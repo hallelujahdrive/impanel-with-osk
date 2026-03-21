@@ -30,6 +30,7 @@
 		"lint": "biome lint . && eslint .",
 		"lint:fix": "biome lint --write . && eslint . --fix",
 		"test": "echo \"Error: no test specified\" && exit 1",
+		"typecheck": "tsc --noEmit --pretty",
 		"prepare": "husky"
 	},
 	"type": "module"

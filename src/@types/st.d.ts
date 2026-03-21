@@ -1,20 +1,9 @@
 import type StBase from "@girs/st-14";
 
-declare module "@girs/st-14/st-14" {
-	export namespace St {
-		interface Button {
-			_extendedKeys: null | StBase.BoxLayout;
-			extendedKey: null | string;
-		}
-	}
-
-	export default St;
-}
-
 declare module "gi://St" {
 	namespace St {
 		interface Button<A = unknown> {
-			_extendedKeys: unknown;
+			_extendedKeys: null | StBase.BoxLayout;
 			extendedKey: null | string;
 		}
 		interface Widget {

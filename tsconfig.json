@@ -3,7 +3,7 @@
 		"allowJs": true,
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"outDir": "./dist",
+		"outDir": "./build",
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": false,

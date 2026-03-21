@@ -18,6 +18,9 @@ export default class IMPanelWithOSK extends Extension {
 		this.settings = this.getSettings(
 			"org.gnome.shell.extensions.impanel-with-osk",
 		);
-		this.kimpanel = new Kimpanel(this.settings, this.dir);
+		this.kimpanel = new Kimpanel(
+			this.settings,
+			this.dir as unknown as Gio.File,
+		);
 	}
 }

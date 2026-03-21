@@ -11,6 +11,9 @@ import { InputPanel } from "./panel.js";
 import { SuggestionsManager } from "./suggestions.js";
 import type { IKimPanel } from "./types/kimpanel.js";
 
+// biome-ignore lint/suspicious/noExplicitAny: GIR callback signature
+const EMPTY_VARIANT = null as unknown as GLib.Variant<any>;
+
 const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
 const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
 const FCITX_INTERFACE_CONTROLLER = "org.fcitx.Fcitx.Controller1" as const;
@@ -207,7 +210,7 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		public emit(signal: string): void {
-			this.impl?.emit_signal(signal, null);
+			this.impl?.emit_signal(signal, EMPTY_VARIANT);
 		}
 
 		public getTextStyle(): string {
@@ -225,11 +228,11 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		public lookupPageDown(): void {
-			this.impl?.emit_signal("LookupTablePageDown", null);
+			this.impl?.emit_signal("LookupTablePageDown", EMPTY_VARIANT);
 		}
 
 		public lookupPageUp(): void {
-			this.impl?.emit_signal("LookupTablePageUp", null);
+			this.impl?.emit_signal("LookupTablePageUp", EMPTY_VARIANT);
 		}
 
 		public selectCandidate(arg: number): void {
@@ -463,8 +466,8 @@ export const Kimpanel = GObject.registerClass(
 			if (this.isDestroyed) {
 				return;
 			}
-			this.impl?.emit_signal("PanelCreated", null);
-			this.impl2?.emit_signal("PanelCreated2", null);
+			this.impl?.emit_signal("PanelCreated", EMPTY_VARIANT);
+			this.impl2?.emit_signal("PanelCreated2", EMPTY_VARIANT);
 		}
 
 		private resetData(): void {
