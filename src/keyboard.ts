@@ -78,6 +78,7 @@ const AllSuggestions = GObject.registerClass(
 		public set(texts: string[]): void {
 			this.boxLayout?.remove_all_children();
 			this.show();
+			this.boxLayout?.set_height(-1);
 
 			for (const text of texts) {
 				const row = this.getRow();
@@ -89,7 +90,7 @@ const AllSuggestions = GObject.registerClass(
 					this.kimpanel.selectCandidateText(text);
 
 					Main.keyboard._keyboard?._aspectContainer?.show();
-					this.hide();
+					this.reset();
 				};
 
 				button.connect("button-press-event", () => {

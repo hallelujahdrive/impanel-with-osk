@@ -5,7 +5,7 @@ import perfectionist from "eslint-plugin-perfectionist";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
 	{
-		files: ["**/*.{js,ts}"],
+		files: ["**/*.{js,ts}", "data/**/*.json"],
 	},
 	{
 		ignores: ["node_modules/**", "dist/**"],

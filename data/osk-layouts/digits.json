@@ -15,8 +15,8 @@
 						"strings": ["9"]
 					},
 					{
-						"action": "delete",
-						"iconName": "edit-clear-symbolic"
+						"iconName": "edit-clear-symbolic",
+						"keyval": "0xff08"
 					}
 				],
 				[
@@ -30,9 +30,9 @@
 						"strings": ["6"]
 					},
 					{
+						"height": 2,
 						"iconName": "keyboard-enter-symbolic",
-						"keyval": "0xff0d",
-						"height": 2
+						"keyval": "0xff0d"
 					}
 				],
 				[
@@ -48,8 +48,8 @@
 				],
 				[
 					{
-						"width": 3,
-						"strings": ["0"]
+						"strings": ["0"],
+						"width": 3
 					},
 					{
 						"action": "hide",
