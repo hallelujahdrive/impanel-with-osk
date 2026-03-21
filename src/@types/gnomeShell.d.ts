@@ -378,13 +378,14 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	}
 
 	interface KeyContainer extends St.Widget {
+		_currentCol: number;
 		_gridLayout: Clutter.GridLayout;
+		_maxCols: number;
 		appendKey(key, width = 1, height = 1, leftOffset = 0): void;
 		appendRow(): void;
 		getRatio(): [number, number];
 		hide(): void;
 		mode: string;
-
 		shiftKeys: unknown[];
 
 		show(): void;

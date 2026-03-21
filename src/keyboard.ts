@@ -15,7 +15,21 @@ import * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keybo
 import type { IKimPanel } from "./types/kimpanel.js";
 import type { Key } from "./types/oskLayout.js";
 
+interface KeyLike extends St.BoxLayout {
+	keyButton: null | St.Button;
+	setLatched(latched: boolean): void;
+}
+
 const KEY_LONG_PRESS_TIME = 250 as const;
+type KeyLikeConstructor = new (
+	params: {
+		commitString?: string;
+		iconName?: string;
+		keyval?: number | string;
+		label?: string;
+	},
+	extendedKeys?: string[],
+) => KeyLike;
 
 const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
@@ -143,310 +157,6 @@ const AllSuggestions = GObject.registerClass(
 	},
 );
 
-const CustomKey = GObject.registerClass(
-	{
-		Signals: {
-			commit: { param_types: [GObject.TYPE_STRING] },
-			keyval: { param_types: [GObject.TYPE_UINT] },
-			"long-press": {},
-			pressed: {},
-			released: {},
-		},
-	},
-	class CustomKey extends St.BoxLayout {
-		// begin-remove
-		public capturedPress!: boolean;
-		public keyButton!: null | St.Button;
-
-		get iconName() {
-			return this.icon.icon_name ?? "";
-		}
-		set iconName(value: string) {
-			this.icon.icon_name = value;
-		}
-		get subkeys() {
-			return this.boxPointer;
-		}
-		private boxPointer!: BoxPointer.BoxPointer | null;
-		private extendedKeyboard!: null | St.BoxLayout;
-		private extendedKeys!: string[];
-		private icon!: St.Icon;
-		private keyButtonMappedId!: number;
-		private keyval!: number;
-		private pressed!: boolean;
-		private pressTimeoutId!: number;
-		private stageCaptureEventId!: number;
-
-		private touchPressSlot!: null | number;
-
-		// end-remove
-		constructor(
-			params: {
-				commitString?: string;
-				iconName?: string;
-				keyval?: number | string;
-				label?: string;
-			},
-			extendedKeys: string[] = [],
-		) {
-			const { commitString, iconName, keyval, label } = {
-				keyval: 0,
-				...params,
-			};
-			super({ style_class: "key-container" });
-
-			this.keyval =
-				typeof keyval === "number" ? keyval : Number.parseInt(keyval, 16);
-			this.keyButton = this.makeKey(commitString, label, iconName);
-
-			/* Add the key in a container, so keys can be padded without losing
-			 * logical proportions between those.
-			 */
-			this.add_child(this.keyButton);
-			this.connect("destroy", this.onDestroy.bind(this));
-
-			this.extendedKeys = extendedKeys;
-			this.extendedKeyboard = null;
-			this.pressTimeoutId = 0;
-			this.stageCaptureEventId = 0;
-			this.keyButtonMappedId = 0;
-			this.capturedPress = false;
-		}
-
-		public setLatched(latched: boolean) {
-			if (latched) this.keyButton?.add_style_pseudo_class("latched");
-			else this.keyButton?.remove_style_pseudo_class("latched");
-		}
-
-		private cancel(): void {
-			if (this.pressTimeoutId !== 0) {
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
-			}
-			this.touchPressSlot = null;
-			this.keyButton?.set_hover(false);
-			this.keyButton?.fake_release();
-		}
-
-		private ensureExtendedKeysPopup(): void {
-			if (this.extendedKeys.length === 0) return;
-
-			if (this?.boxPointer) return;
-
-			const _boxPointer = new BoxPointer.BoxPointer(St.Side.BOTTOM);
-			this.boxPointer = _boxPointer;
-
-			_boxPointer.hide();
-			Main.layoutManager.addTopChrome(_boxPointer);
-			if (this.keyButton) _boxPointer.setPosition(this.keyButton, 0.5);
-
-			// Adds style to existing keyboard style to avoid repetition
-			_boxPointer.add_style_class_name("keyboard-subkeys");
-			this.getExtendedKeys();
-			if (this.keyButton)
-				Reflect.set(this.keyButton, "_extendedKeys", this.extendedKeyboard);
-		}
-
-		private getExtendedKeys(): void {
-			this.extendedKeyboard = new St.BoxLayout({
-				style_class: "key-container",
-				vertical: false,
-			});
-
-			for (const extendedKey of this.extendedKeys) {
-				const key = this.makeKey(extendedKey);
-
-				Reflect.set(key, "extendedKey", extendedKey);
-				this.extendedKeyboard?.add_child(key);
-
-				if (this.keyButton) {
-					const keyButton = this.keyButton;
-					key.set_size(...keyButton.allocation.get_size());
-					keyButton.connect("notify::allocation", () =>
-						key.set_size(...keyButton.allocation.get_size()),
-					);
-				}
-			}
-			const _extendedKeyboard = this.extendedKeyboard;
-
-			if (_extendedKeyboard != null)
-				this.boxPointer?.bin.add_child(_extendedKeyboard);
-		}
-
-		private hideSubkeys(): void {
-			if (this.boxPointer)
-				this.boxPointer?.close(BoxPointer.PopupAnimation.FULL);
-
-			this.keyButton?.remove_style_class_name("active");
-
-			if (this.stageCaptureEventId !== 0) {
-				global.stage.disconnect(this.stageCaptureEventId);
-				this.stageCaptureEventId = 0;
-			}
-			if (this.keyButton && this.keyButtonMappedId !== 0) {
-				this.keyButton.disconnect(this.keyButtonMappedId);
-				this.keyButtonMappedId = 0;
-			}
-			this.capturedPress = false;
-		}
-
-		private makeKey(
-			commitString?: string,
-			label?: string,
-			icon?: string,
-		): St.Button {
-			const button = new St.Button({
-				style_class: "keyboard-key",
-				x_expand: true,
-			});
-
-			if (icon) {
-				const child = new St.Icon({ icon_name: icon });
-				button.set_child(child);
-				this.icon = child;
-			} else if (label) {
-				button.set_label(label);
-			} else if (commitString) {
-				button.set_label(commitString);
-			}
-
-			button.connect("button-press-event", () => {
-				this.press(button);
-				button.add_style_pseudo_class("active");
-				return Clutter.EVENT_STOP;
-			});
-			button.connect("button-release-event", () => {
-				this.release(button, commitString);
-				button.remove_style_pseudo_class("active");
-				return Clutter.EVENT_STOP;
-			});
-			button.connect("touch-event", (_actor, event) => {
-				const slot = event.get_event_sequence().get_slot();
-
-				if (
-					!this.touchPressSlot &&
-					event.type() === Clutter.EventType.TOUCH_BEGIN
-				) {
-					this.touchPressSlot = slot;
-					this.press(button);
-					button.add_style_pseudo_class("active");
-				} else if (event.type() === Clutter.EventType.TOUCH_END) {
-					if (!this.touchPressSlot || this.touchPressSlot === slot) {
-						this.release(button, commitString);
-						button.remove_style_pseudo_class("active");
-					}
-
-					if (this.touchPressSlot === slot) this.touchPressSlot = null;
-				}
-				return Clutter.EVENT_STOP;
-			});
-
-			return button;
-		}
-
-		private onCapturedEvent(
-			_actor: Clutter.Actor,
-			event: Clutter.Event,
-		): boolean {
-			const type = event.type();
-			const press =
-				type === Clutter.EventType.BUTTON_PRESS ||
-				type === Clutter.EventType.TOUCH_BEGIN;
-			const release =
-				type === Clutter.EventType.BUTTON_RELEASE ||
-				type === Clutter.EventType.TOUCH_END;
-			const targetActor = global.stage.get_event_actor(event);
-
-			if (
-				targetActor &&
-				(targetActor === this.boxPointer?.bin ||
-					this.boxPointer?.bin.contains(targetActor))
-			)
-				return Clutter.EVENT_PROPAGATE;
-
-			if (press) this.capturedPress = true;
-			else if (release && this.capturedPress) {
-				this.hideSubkeys();
-			}
-			return Clutter.EVENT_STOP;
-		}
-
-		private onDestroy(): void {
-			this.hideSubkeys();
-			if (this.boxPointer) {
-				this.boxPointer?.destroy();
-				this.boxPointer = null;
-			}
-
-			this.cancel();
-		}
-
-		private press(button: St.Button): void {
-			if (button === this.keyButton) {
-				this.pressTimeoutId = GLib.timeout_add(
-					GLib.PRIORITY_DEFAULT,
-					KEY_LONG_PRESS_TIME,
-					() => {
-						this.pressTimeoutId = 0;
-
-						this.emit("long-press");
-
-						if (this.extendedKeys.length > 0) {
-							this.touchPressSlot = null;
-							this.ensureExtendedKeysPopup();
-							this.keyButton?.set_hover(false);
-							this.keyButton?.fake_release();
-							this.showSubkeys();
-						}
-
-						return GLib.SOURCE_REMOVE;
-					},
-				);
-			}
-
-			this.emit("pressed");
-			this.pressed = true;
-		}
-
-		private release(button: St.Button, commitString?: string): void {
-			if (this.pressTimeoutId !== 0) {
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
-			}
-
-			if (this.pressed) {
-				if (this.keyval && button === this.keyButton) {
-					this.emit("keyval", this.keyval);
-				} else if (commitString) this.emit("commit", commitString);
-				else console.error("Need keyval or commitString");
-			}
-
-			this.emit("released");
-			this.hideSubkeys();
-			this.pressed = false;
-		}
-
-		private showSubkeys(): void {
-			this.boxPointer?.open(BoxPointer.PopupAnimation.FULL);
-			if (this.stageCaptureEventId !== 0) {
-				global.stage.disconnect(this.stageCaptureEventId);
-			}
-			this.stageCaptureEventId = global.stage.connect(
-				"captured-event",
-				this.onCapturedEvent.bind(this),
-			);
-			if (this.keyButton && this.keyButtonMappedId !== 0) {
-				this.keyButton.disconnect(this.keyButtonMappedId);
-			}
-			this.keyButtonMappedId =
-				this.keyButton?.connect("notify::mapped", () => {
-					if (!this.keyButton || !this.keyButton.is_mapped())
-						this.hideSubkeys();
-				}) ?? 0;
-		}
-	},
-);
-
 const ExpandButton = GObject.registerClass(
 	class ExpandButton extends St.Button {
 		constructor() {
@@ -565,7 +275,8 @@ export const Keyboard = GObject.registerClass(
 		private allSuggestions: null | typeof AllSuggestions.prototype = null;
 		private injectionManager: InjectionManager | null;
 		private kanaActive: boolean;
-		private toggleIMKeySet: null | Set<typeof CustomKey.prototype>;
+		private keyConstructor: KeyLikeConstructor | null = null;
+		private toggleIMKeySet: null | Set<KeyLike>;
 		// end-remove
 		constructor(
 			private readonly kimpanel: IKimPanel,
@@ -749,6 +460,24 @@ export const Keyboard = GObject.registerClass(
 				layout: KeyboardBase.KeyContainer,
 				emojiVisible: boolean,
 			) {
+				// if the key constructor is null, call the original method
+				if (_this.keyConstructor == null) {
+					_originalMethod.call(this, [{ strings: [""] }], layout, emojiVisible);
+
+					_this.keyConstructor = (layout.firstChild?.constructor ??
+						null) as KeyLikeConstructor | null;
+
+					layout.remove_all_children();
+					layout._currentCol = 0;
+					layout._maxCols = 0;
+					layout.shiftKeys = [];
+				}
+
+				// Constructor type is not available in typings for the original key widget.
+				if (_this.keyConstructor == null) {
+					return;
+				}
+
 				let accumulatedWidth = 0;
 				for (const key of keys) {
 					const { strings } = key;
@@ -765,7 +494,7 @@ export const Keyboard = GObject.registerClass(
 						accumulatedWidth = 0;
 					}
 
-					const button = new CustomKey(
+					const button = new _this.keyConstructor(
 						{
 							commitString,
 							iconName: key.iconName,
@@ -801,13 +530,13 @@ export const Keyboard = GObject.registerClass(
 							this._longPressed = false;
 						});
 					} else if (key.keyval) {
-						button.connect("keyval", (_actor, keyval) => {
+						button.connect("keyval", (_actor: unknown, keyval: number) => {
 							this._keyboardController.keyvalPress(keyval);
 							this._keyboardController.keyvalRelease(keyval);
 							this._updateLevelFromHints(true);
 						});
 					} else {
-						button.connect("commit", (_actor, str) => {
+						button.connect("commit", (_actor: unknown, str: string) => {
 							if (_this.kanaActive) {
 								this._keyboardController.keyvalPress(str.charCodeAt(0));
 								this._keyboardController.keyvalRelease(str.charCodeAt(0));
