@@ -20,7 +20,10 @@ interface KeyLike extends St.BoxLayout {
 	setLatched(latched: boolean): void;
 }
 
-/** 候補ボタン上で、この縦移動量(px)を超えたらスクロール扱い（タップ確定はしない）。 */
+/** The base padding of the keyboard. */
+const BASE_PADDING = 6 as const;
+
+/** If the vertical movement amount (px) exceeds this threshold on the candidate button, it is treated as a scroll (the tap is not confirmed). */
 const SUGGESTION_SCROLL_DRAG_THRESHOLD_PX = 16 as const;
 
 type KeyLikeConstructor = new (
@@ -34,7 +37,10 @@ type KeyLikeConstructor = new (
 ) => KeyLike;
 
 /**
- * 新規 Keyboard はレイアウト前に width が 0 のことがある。chrome の keyboardBox を参照する。
+ * Get the width of the keyboard content.
+ * If the keyboard width is greater than 1, return the keyboard width.
+ * If the keyboard width is 0, return the keyboard box width.
+ * If the keyboard width is less than 1, return the maximum of the keyboard width and the keyboard box width.
  */
 function oskKeyboardContentWidth(): number {
 	const keyboardWidth = Main.keyboard._keyboard?.width ?? 0;
@@ -294,7 +300,10 @@ const AllSuggestions = GObject.registerClass(
 			const suggestions = keyboard._suggestions;
 			if (suggestions == null) return;
 
-			const height = Math.max(1, keyboard.height - suggestions.height - 24); // $base_padding * 2 * 2
+			const height = Math.max(
+				1,
+				keyboard.height - suggestions.height - BASE_PADDING * 2 * 2,
+			);
 			if (this.height !== height) {
 				this.set_height(height);
 				this.candidateContainer?.set_height(height);
