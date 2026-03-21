@@ -168,11 +168,11 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		clear(): void;
 		get_child_at_index(index: number): Clutter.Actor | null;
 		get_children(): Clutter.Actor[];
+		height: number;
 		lastChild: Clutter.Actor | null;
 		remove_child(child: unknown): void;
 		set_width(width: number): void;
 		set_x_align(align: Clutter.ActorAlign): void;
-
 		setVisible(visible: boolean): void;
 		width: number;
 	}
@@ -398,6 +398,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		add_child(child: unknown): void;
 		get_child_at_index(index: number): Clutter.Actor | null;
 		get_children(): Clutter.Actor[];
+		height: number;
 		lastChild: Clutter.Actor | null;
 		remove_child(child: unknown): void;
 		set_width(width: number): void;

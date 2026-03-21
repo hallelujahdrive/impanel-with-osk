@@ -1,6 +1,5 @@
 import Clutter from "gi://Clutter";
 import Gio from "gi://Gio";
-import GLib from "gi://GLib";
 import GObject from "gi://GObject";
 import St from "gi://St";
 import {
@@ -20,7 +19,9 @@ interface KeyLike extends St.BoxLayout {
 	setLatched(latched: boolean): void;
 }
 
-const KEY_LONG_PRESS_TIME = 250 as const;
+/** 候補ボタン上で、この縦移動量(px)を超えたらスクロール扱い（タップ確定はしない）。 */
+const SUGGESTION_SCROLL_DRAG_THRESHOLD_PX = 16 as const;
+
 type KeyLikeConstructor = new (
 	params: {
 		commitString?: string;
@@ -35,10 +36,12 @@ const AllSuggestions = GObject.registerClass(
 	class AllSuggestions extends St.ScrollView {
 		// begin-remove
 		private candidateContainer!: null | St.BoxLayout;
+		private keyboardBoxNotifyHeightId = 0;
+		private keyboardBoxNotifyWidthId = 0;
 		private lastScrollY: null | number = null;
-		private longPressScroll = false;
 		private panGesture: Clutter.PanGesture | null = null;
-		private pressTimeoutId: number;
+		private pressStartY: null | number = null;
+		private scrollDragging = false;
 		// end-remove
 		constructor(private readonly kimpanel: IKimPanel) {
 			super({
@@ -47,8 +50,6 @@ const AllSuggestions = GObject.registerClass(
 				vscrollbarPolicy: St.PolicyType.AUTOMATIC,
 				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
-				yAlign: Clutter.ActorAlign.FILL,
-				yExpand: true,
 			});
 
 			this.candidateContainer = new St.BoxLayout({
@@ -59,32 +60,41 @@ const AllSuggestions = GObject.registerClass(
 				yExpand: true,
 			});
 
-			this.pressTimeoutId = 0;
-
 			this.set_child(this.candidateContainer);
 
-			Main.layoutManager.keyboardBox.connect("notify::width", () => {
-				if (
-					Main.keyboard._keyboard == null ||
-					this.width === Main.keyboard._keyboard.width
-				)
-					return;
+			this.keyboardBoxNotifyWidthId = Main.layoutManager.keyboardBox.connect(
+				"notify::width",
+				() => {
+					if (
+						Main.keyboard._keyboard == null ||
+						this.width === Main.keyboard._keyboard.width
+					)
+						return;
 
-				this?.set_width(Main.keyboard._keyboard.width);
-				this.candidateContainer?.set_width(Main.keyboard._keyboard.width);
-			});
+					this.set_width(Main.keyboard._keyboard.width);
+					this.candidateContainer?.set_width(Main.keyboard._keyboard.width);
+				},
+			);
 
-			Main.layoutManager.keyboardBox.connect("notify::height", () => {
-				if (Main.keyboard._keyboard?._suggestions == null) return;
-				const height =
-					Main.keyboard._keyboard.height -
-					Main.keyboard._keyboard._suggestions.width;
+			this.keyboardBoxNotifyHeightId = Main.layoutManager.keyboardBox.connect(
+				"notify::height",
+				() => {
+					const keyboard = Main.keyboard._keyboard;
+					const suggestions = keyboard?._suggestions;
+					if (keyboard == null || suggestions == null) return;
 
-				if (this.height === height) return;
+					const stripH = suggestions.height;
+					const height = Math.max(
+						1,
+						keyboard.height - stripH - 24, // $base_padding * 2 * 2
+					);
 
-				this?.set_height(height);
-				this.candidateContainer?.set_height(height);
-			});
+					if (this.height === height) return;
+
+					this.set_height(height);
+					this.candidateContainer?.set_height(height);
+				},
+			);
 
 			this.panGesture = new Clutter.PanGesture();
 			this.panGesture.set_pan_axis(Clutter.PanAxis.Y);
@@ -103,12 +113,25 @@ const AllSuggestions = GObject.registerClass(
 		}
 
 		public destroy(): void {
+			if (this.keyboardBoxNotifyWidthId !== 0) {
+				Main.layoutManager.keyboardBox.disconnect(
+					this.keyboardBoxNotifyWidthId,
+				);
+				this.keyboardBoxNotifyWidthId = 0;
+			}
+			if (this.keyboardBoxNotifyHeightId !== 0) {
+				Main.layoutManager.keyboardBox.disconnect(
+					this.keyboardBoxNotifyHeightId,
+				);
+				this.keyboardBoxNotifyHeightId = 0;
+			}
+
 			if (this.candidateContainer != null) {
-				this?.remove_child(this.candidateContainer);
+				this.remove_child(this.candidateContainer);
+				this.candidateContainer.destroy();
 				this.candidateContainer = null;
 			}
-			this.cancelPendingPress();
-			this.endLongPressScroll();
+			this.resetSuggestionPointerState();
 
 			if (this.panGesture != null) {
 				this.remove_action(this.panGesture);
@@ -140,54 +163,49 @@ const AllSuggestions = GObject.registerClass(
 					this.reset();
 				};
 
-				button.connect("button-press-event", () => {
-					this.buttonPress();
+				button.connect("button-press-event", (_actor, event: Clutter.Event) => {
+					const [, y] = event.get_coords();
+					this.suggestionPointerDown(y);
 					return Clutter.EVENT_PROPAGATE;
 				});
 
 				button.connect("button-release-event", () => {
-					this.buttonRelease(callback);
+					this.suggestionButtonRelease(callback);
 					return Clutter.EVENT_STOP;
 				});
 
 				button.connect("motion-event", (_actor, event: Clutter.Event) => {
-					if (
-						!this.longPressScroll ||
-						(event.get_state() & Clutter.ModifierType.BUTTON1_MASK) === 0
-					)
+					if ((event.get_state() & Clutter.ModifierType.BUTTON1_MASK) === 0)
 						return Clutter.EVENT_PROPAGATE;
 
 					const [, y] = event.get_coords();
-					this.applyScrollStepFromY(y);
-					return Clutter.EVENT_STOP;
+					if (this.scrollDragging) {
+						this.applyScrollStepFromY(y);
+						return Clutter.EVENT_STOP;
+					}
+					this.maybeStartScrollFromButton(y);
+					return this.scrollDragging
+						? Clutter.EVENT_STOP
+						: Clutter.EVENT_PROPAGATE;
 				});
 
 				button.connect("touch-event", (_actor, event: Clutter.Event) => {
 					const type = event.type();
 					if (type === Clutter.EventType.TOUCH_BEGIN) {
-						this.buttonPress();
-					} else if (
-						type === Clutter.EventType.TOUCH_UPDATE &&
-						this.longPressScroll
-					) {
 						const [, y] = event.get_coords();
-						this.applyScrollStepFromY(y);
+						this.suggestionPointerDown(y);
+					} else if (type === Clutter.EventType.TOUCH_UPDATE) {
+						const [, y] = event.get_coords();
+						if (this.scrollDragging) this.applyScrollStepFromY(y);
+						else this.maybeStartScrollFromButton(y);
 					} else if (type === Clutter.EventType.TOUCH_END) {
-						this.buttonRelease(callback);
+						this.suggestionButtonRelease(callback);
 					} else if (type === Clutter.EventType.TOUCH_CANCEL) {
-						this.cancelPendingPress();
-						this.endLongPressScroll();
+						this.resetSuggestionPointerState();
 					}
 
 					return Clutter.EVENT_STOP;
 				});
-
-				console.log(
-					"WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
-					text,
-					this.width,
-					this.candidateContainer?.width,
-				);
 
 				row.add_child(button);
 
@@ -200,12 +218,6 @@ const AllSuggestions = GObject.registerClass(
 					newRow.add_child(button);
 					this.candidateContainer?.add_child(newRow);
 				}
-
-				console.log(
-					"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
-					this.height,
-					this.candidateContainer?.height,
-				);
 			}
 		}
 
@@ -220,42 +232,6 @@ const AllSuggestions = GObject.registerClass(
 			adjustment.value -= dy;
 		}
 
-		private buttonPress(): void {
-			this.cancelPendingPress();
-			this.longPressScroll = false;
-			this.lastScrollY = null;
-			this.pressTimeoutId = GLib.timeout_add(
-				GLib.PRIORITY_DEFAULT,
-				KEY_LONG_PRESS_TIME,
-				() => {
-					this.pressTimeoutId = 0;
-					this.longPressScroll = true;
-					this.lastScrollY = null;
-					return GLib.SOURCE_REMOVE;
-				},
-			);
-		}
-
-		private buttonRelease(callback: () => void): void {
-			if (this.pressTimeoutId !== 0) {
-				callback();
-				this.cancelPendingPress();
-			}
-			this.endLongPressScroll();
-		}
-
-		private cancelPendingPress(): void {
-			if (this.pressTimeoutId !== 0) {
-				GLib.source_remove(this.pressTimeoutId);
-				this.pressTimeoutId = 0;
-			}
-		}
-
-		private endLongPressScroll(): void {
-			this.longPressScroll = false;
-			this.lastScrollY = null;
-		}
-
 		private getRow(): Clutter.Actor {
 			const row = this.candidateContainer?.get_last_child();
 
@@ -268,6 +244,36 @@ const AllSuggestions = GObject.registerClass(
 			this.candidateContainer?.add_child(newRow);
 
 			return newRow;
+		}
+
+		private maybeStartScrollFromButton(y: number): void {
+			if (this.pressStartY == null) return;
+			if (Math.abs(y - this.pressStartY) < SUGGESTION_SCROLL_DRAG_THRESHOLD_PX)
+				return;
+
+			const totalDy = y - this.pressStartY;
+			const adjustment = this.get_vadjustment();
+			adjustment.value -= totalDy;
+			this.scrollDragging = true;
+			this.lastScrollY = y;
+			this.pressStartY = null;
+		}
+
+		private resetSuggestionPointerState(): void {
+			this.pressStartY = null;
+			this.scrollDragging = false;
+			this.lastScrollY = null;
+		}
+
+		private suggestionButtonRelease(callback: () => void): void {
+			if (!this.scrollDragging) callback();
+			this.resetSuggestionPointerState();
+		}
+
+		private suggestionPointerDown(y: number): void {
+			this.pressStartY = y;
+			this.scrollDragging = false;
+			this.lastScrollY = null;
 		}
 	},
 );
