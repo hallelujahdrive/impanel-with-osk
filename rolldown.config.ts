@@ -58,6 +58,7 @@ export default defineConfig({
 	output: {
 		dir: `./dist`,
 		format: "esm",
+		minify: "dce-only",
 	},
 	platform: "neutral",
 	plugins: [replace(), removeRuntimeHelper()],

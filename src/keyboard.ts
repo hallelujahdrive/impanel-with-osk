@@ -337,6 +337,9 @@ export const Keyboard = GObject.registerClass(
 				}
 			}
 
+			// set the width of the suggestions to the container width
+			Main.keyboard._keyboard?._suggestions?.set_width(containerWidth);
+
 			const suggestionsCount =
 				Main.keyboard._keyboard?._suggestions?.get_children().length ?? 0;
 
