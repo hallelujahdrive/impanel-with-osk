@@ -81,15 +81,14 @@ const AllSuggestions = GObject.registerClass(
 
 			this.set_child(this.candidateContainer);
 
-			const keyboardBox = Main.layoutManager.keyboardBox;
-			this.keyboardBoxNotifyWidthId = keyboardBox.connect(
+			this.keyboardBoxNotifyWidthId = Main.layoutManager.keyboardBox.connect(
 				"notify::width",
 				() => {
 					this.syncLayoutFromKeyboard();
 				},
 			);
 
-			this.keyboardBoxNotifyHeightId = keyboardBox.connect(
+			this.keyboardBoxNotifyHeightId = Main.layoutManager.keyboardBox.connect(
 				"notify::height",
 				() => {
 					this.syncLayoutFromKeyboard();
@@ -224,6 +223,7 @@ const AllSuggestions = GObject.registerClass(
 			const parent = this.get_parent() as Clutter.Actor | null;
 			parent?.queue_relayout();
 
+			// sync the layout from the keyboard again
 			GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
 				if (!this.visible) return GLib.SOURCE_REMOVE;
 				this.syncLayoutFromKeyboard();
@@ -472,15 +472,15 @@ export const Keyboard = GObject.registerClass(
 		public setSuggestions(texts: string[]): void {
 			this.ensureOskKeyboardPatched();
 			Main.keyboard.resetSuggestions();
+
 			// reset the width of the suggestions to auto-size
 			Main.keyboard._keyboard?._suggestions?.set_width(-1);
 			Main.keyboard._keyboard?._aspectContainer?.show();
 			this.allSuggestions?.reset();
 
-			const kb = Main.keyboard._keyboard;
-			(kb as unknown as Clutter.Actor | null)?.queue_relayout();
+			Main.keyboard._keyboard?.queue_relayout();
 			let containerWidth = oskKeyboardContentWidth();
-			if (containerWidth < 1 && kb != null) {
+			if (containerWidth < 1) {
 				Main.layoutManager.keyboardBox.queue_relayout();
 				containerWidth = oskKeyboardContentWidth();
 			}
@@ -530,6 +530,7 @@ export const Keyboard = GObject.registerClass(
 					suggestions.remove_child(key);
 				}
 			}
+
 			suggestions.set_width(containerWidth);
 
 			const _suggestions = texts.slice(suggestions.get_children().length - 2);
@@ -606,29 +607,30 @@ export const Keyboard = GObject.registerClass(
 			return true;
 		}
 
+		private ensureAllSuggestionsAttached(): boolean {
+			if (this.allSuggestions == null) return false;
+
+			try {
+				return this.allSuggestions.get_parent() === Main.keyboard._keyboard;
+			} catch {
+				return false;
+			}
+		}
+
 		/**
-		 * Shell の KeyboardManager は OSK オフ時に Keyboard を destroy し、再表示で新インスタンスを
-		 * 作る。拡張が付けた allSuggestions / oskCompletion は古いインスタンスに残るため毎回合わせる。
+		 * Ensure the OSK keyboard is patched.
 		 */
 		private ensureOskKeyboardPatched(): void {
-			const kb = Main.keyboard._keyboard;
-			if (kb == null) return;
+			if (Main.keyboard._keyboard == null) return;
 
-			if (kb._keyboardController != null) {
-				kb._keyboardController.oskCompletion = true;
+			if (Main.keyboard._keyboard._keyboardController != null) {
+				Main.keyboard._keyboard._keyboardController.oskCompletion = true;
 			}
-			kb._suggestions?.set_x_align(Clutter.ActorAlign.START);
+			Main.keyboard._keyboard._suggestions?.set_x_align(
+				Clutter.ActorAlign.START,
+			);
 
-			let attached = false;
-			if (this.allSuggestions != null) {
-				try {
-					attached = this.allSuggestions.get_parent() === kb;
-				} catch {
-					attached = false;
-				}
-			}
-
-			if (attached) return;
+			if (this.ensureAllSuggestionsAttached()) return;
 
 			if (this.allSuggestions != null) {
 				try {
@@ -640,10 +642,9 @@ export const Keyboard = GObject.registerClass(
 			}
 
 			this.allSuggestions = new AllSuggestions(this.kimpanel);
-			const kbActor = kb as unknown as Clutter.Actor;
-			kbActor.insert_child_at_index(this.allSuggestions, 1);
+			Main.keyboard._keyboard.insert_child_at_index(this.allSuggestions, 1);
 			this.allSuggestions.hide();
-			kbActor.queue_relayout();
+			Main.keyboard._keyboard.queue_relayout();
 			Main.layoutManager.keyboardBox.queue_relayout();
 		}
 

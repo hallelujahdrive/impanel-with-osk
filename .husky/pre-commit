@@ -1,2 +1,2 @@
-bun run check
+devbox run -- bun run check
 git update-index --again
