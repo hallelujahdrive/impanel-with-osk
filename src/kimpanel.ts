@@ -87,16 +87,16 @@ export const Kimpanel = GObject.registerClass(
 		// begin-remove
 		public aux!: string;
 		public conn: Gio.DBusConnection | null;
-		public current_service: string;
+		public currentService: string;
 		public dbusSignal: number;
 		public enabled!: boolean;
 		public fontSignal: number;
 		public h!: number;
-		public helper_owner_id: number;
+		public helperOwnerId: number;
 		public indicator: null | typeof KimIndicator.prototype;
 		public keyboard: null | typeof Keyboard.prototype;
 		public menu: null | typeof KimMenu.prototype;
-		public owner_id: number;
+		public ownerId: number;
 		public pos!: number;
 		public preedit!: string;
 		public relative!: boolean;
@@ -107,7 +107,7 @@ export const Kimpanel = GObject.registerClass(
 		public showPreedit!: boolean;
 		public verticalSignal: number;
 		public w!: number;
-		public watch_id: number;
+		public watchId: number;
 		public x!: number;
 		public y!: number;
 
@@ -132,8 +132,8 @@ export const Kimpanel = GObject.registerClass(
 			this.helperImpl = Gio.DBusExportedObject.wrapJSObject(HelperIface, this);
 			this.helperImpl.export(Gio.DBus.session, "/org/fcitx/GnomeHelper");
 			this.suggestionsManager = new SuggestionsManager(this);
-			this.current_service = "";
-			this.watch_id = 0;
+			this.currentService = "";
+			this.watchId = 0;
 			this.indicator = new KimIndicator({ kimpanel: this });
 			this.inputPanel = new InputPanel({ kimpanel: this });
 			this.keyboard = new Keyboard(this, dir);
@@ -157,7 +157,7 @@ export const Kimpanel = GObject.registerClass(
 				Gio.DBusSignalFlags.NONE,
 				this.parseSignal.bind(this),
 			);
-			this.owner_id = Gio.bus_own_name(
+			this.ownerId = Gio.bus_own_name(
 				Gio.BusType.SESSION,
 				"org.kde.impanel",
 				Gio.BusNameOwnerFlags.NONE,
@@ -165,7 +165,7 @@ export const Kimpanel = GObject.registerClass(
 				() => this.requestNameFinished(),
 				null,
 			);
-			this.helper_owner_id = Gio.bus_own_name(
+			this.helperOwnerId = Gio.bus_own_name(
 				Gio.BusType.SESSION,
 				"org.fcitx.GnomeHelper",
 				Gio.BusNameOwnerFlags.NONE,
@@ -179,18 +179,18 @@ export const Kimpanel = GObject.registerClass(
 			this.isDestroyed = true;
 			this.resetData();
 			this.updateInputPanel();
-			if (this.watch_id !== 0) {
-				Gio.bus_unwatch_name(this.watch_id);
-				this.watch_id = 0;
-				this.current_service = "";
+			if (this.watchId !== 0) {
+				Gio.bus_unwatch_name(this.watchId);
+				this.watchId = 0;
+				this.currentService = "";
 			}
 			this.settings?.disconnect(this.verticalSignal);
 			this.settings?.disconnect(this.fontSignal);
 			this.settings = null;
 			this.conn?.signal_unsubscribe(this.dbusSignal);
 			this.conn = null;
-			Gio.bus_unown_name(this.owner_id);
-			Gio.bus_unown_name(this.helper_owner_id);
+			Gio.bus_unown_name(this.ownerId);
+			Gio.bus_unown_name(this.helperOwnerId);
 			this.impl?.unexport();
 			this.impl = null;
 			this.impl2?.unexport();
@@ -325,11 +325,11 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		private imExit(_conn: Gio.DBusConnection, name: string): void {
-			if (this.current_service === name) {
-				this.current_service = "";
-				if (this.watch_id !== 0) {
-					Gio.bus_unwatch_name(this.watch_id);
-					this.watch_id = 0;
+			if (this.currentService === name) {
+				this.currentService = "";
+				if (this.watchId !== 0) {
+					Gio.bus_unwatch_name(this.watchId);
+					this.watchId = 0;
 				}
 
 				this.resetData();
@@ -368,14 +368,14 @@ export const Kimpanel = GObject.registerClass(
 				case "RegisterProperties": {
 					const [value] = param.deepUnpack<[string[]]>();
 
-					if (sender != null && this.current_service !== sender) {
-						this.current_service = sender;
-						if (this.watch_id !== 0) {
-							Gio.bus_unwatch_name(this.watch_id);
+					if (sender != null && this.currentService !== sender) {
+						this.currentService = sender;
+						if (this.watchId !== 0) {
+							Gio.bus_unwatch_name(this.watchId);
 						}
-						this.watch_id = Gio.bus_watch_name(
+						this.watchId = Gio.bus_watch_name(
 							Gio.BusType.SESSION,
-							this.current_service,
+							this.currentService,
 							Gio.BusNameWatcherFlags.NONE,
 							null,
 							this.imExit.bind(this),
