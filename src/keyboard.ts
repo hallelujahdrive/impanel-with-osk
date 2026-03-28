@@ -16,6 +16,7 @@ import type { IKimPanel } from "./types/kimpanel.js";
 import type { Key } from "./types/oskLayout.js";
 
 interface KeyLike extends St.BoxLayout {
+	_pressed: boolean;
 	keyButton: null | St.Button;
 	setLatched(latched: boolean): void;
 }
@@ -341,11 +342,10 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		const inputSourceManager = InputSourceManager.getInputSourceManager();
 		const inputSources = inputSourceManager.inputSources;
 
-		let item: PopupMenu.PopupBaseMenuItem;
 		for (const i in inputSources) {
 			const is = inputSources[i];
 
-			item = this.addAction(is.displayName, () => {
+			const item = this.addAction(is.displayName, () => {
 				inputSourceManager.activateInputSource(is, true);
 			});
 			item.can_focus = false;
@@ -357,7 +357,7 @@ class LanguageSelectionPopup extends PopupMenu.PopupMenu {
 		}
 
 		this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		item = this.addSettingsAction(
+		const item = this.addSettingsAction(
 			_("Keyboard Settings"),
 			"gnome-keyboard-panel.desktop",
 		);
@@ -816,6 +816,21 @@ export const Keyboard = GObject.registerClass(
 
 					if (key.action || key.keyval)
 						button.keyButton?.add_style_class_name("default-key");
+
+					// delete
+					if (key.keyval === "0xff08") {
+						const keyval = parseInt(key.keyval, 16);
+
+						button.connect("long-press", () => {
+							const interval = setInterval(() => {
+								this._keyboardController.keyvalPress(keyval);
+								this._keyboardController.keyvalRelease(keyval);
+								this._updateLevelFromHints(true);
+
+								if (!button._pressed) clearInterval(interval);
+							}, 25);
+						});
+					}
 
 					layout.appendKey(button, key.width, key.height, key.leftOffset);
 				}

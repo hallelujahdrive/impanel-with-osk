@@ -27,7 +27,7 @@ export const KimIndicator = GObject.registerClass(
 		private propertySwitch: Record<string, typeof KimMenuItem.prototype>;
 		// end-remove
 		constructor(params: { kimpanel: IKimPanel }) {
-			super(0.5, "kimpanel");
+			super(0.5, _("IMPanel with OSK"));
 			const _params = Params.parse(params, { kimpanel: null });
 			this.properties = {};
 			this.propertySwitch = {};
