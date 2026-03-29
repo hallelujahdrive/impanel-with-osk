@@ -15,7 +15,7 @@
 						"strings": ["9"]
 					},
 					{
-						"iconName": "edit-clear-symbolic",
+						"iconName": "osk-delete-symbolic",
 						"keyval": "0xff08"
 					}
 				],
@@ -31,7 +31,7 @@
 					},
 					{
 						"height": 2,
-						"iconName": "keyboard-enter-symbolic",
+						"iconName": "osk-enter-symbolic",
 						"keyval": "0xff0d"
 					}
 				],
@@ -53,7 +53,7 @@
 					},
 					{
 						"action": "hide",
-						"iconName": "keyboard-hide-symbolic"
+						"iconName": "osk-hide-symbolic"
 					}
 				]
 			]

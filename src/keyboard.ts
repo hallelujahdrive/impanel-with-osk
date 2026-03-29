@@ -98,10 +98,7 @@ const AllSuggestions = GObject.registerClass(
 
 			this.panGesture = new Clutter.PanGesture();
 			this.panGesture.set_pan_axis(Clutter.PanAxis.Y);
-			(
-				this.panGesture as Clutter.PanGesture & { required_button: number }
-			).required_button = 0;
-			this.panGesture.set_begin_threshold(0);
+			this.panGesture.set_begin_threshold(10);
 
 			this.panGesture.connect("pan-update", (action: Clutter.PanGesture) => {
 				const delta = action.get_delta();
@@ -163,13 +160,7 @@ const AllSuggestions = GObject.registerClass(
 					this.reset();
 				};
 
-				button.connect("button-press-event", (_actor, event: Clutter.Event) => {
-					const [, y] = event.get_coords();
-					this.suggestionPointerDown(y);
-					return Clutter.EVENT_PROPAGATE;
-				});
-
-				button.connect("button-release-event", () => {
+				button.connect("button-press-event", () => {
 					this.suggestionButtonRelease(callback);
 					return Clutter.EVENT_STOP;
 				});
@@ -665,15 +656,6 @@ export const Keyboard = GObject.registerClass(
 				: Gio.Resource.load(modifiedLayoutsPath);
 		}
 
-		private hookKeyboardRegeneration(): void {
-			if (this.keyboardVisibilityHooked) return;
-			this.keyboardVisibilityHooked = true;
-			Main.keyboard.connect("visibility-changed", () => {
-				if (Main.keyboard.visible) this.ensureOskKeyboardPatched();
-				return undefined;
-			});
-		}
-
 		private overrideAddRowKeys(
 			_originalMethod: typeof KeyboardBase.Keyboard.prototype._addRowKeys,
 		): typeof KeyboardBase.Keyboard.prototype._addRowKeys {
@@ -876,7 +858,6 @@ export const Keyboard = GObject.registerClass(
 				Main.keyboard._keyboard = new KeyboardBase.Keyboard();
 			}
 
-			this.hookKeyboardRegeneration();
 			this.ensureOskKeyboardPatched();
 
 			Main.layoutManager.addTopChrome(Main.layoutManager.keyboardBox);
