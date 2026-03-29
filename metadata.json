@@ -3,7 +3,7 @@
 	"gettext-domain": "impanel-with-osk@52hertz-reunion.site",
 	"name": "IM Panel integrated with OSK",
 	"settings-schema": "org.gnome.shell.extensions.impanel-with-osk",
-	"shell-version": ["49"],
+	"shell-version": ["49", "50"],
 	"url": "https://github.com/hallelujahdrive/impanel-with-osk",
 	"uuid": "impanel-with-osk@52hertz-reunion.site"
 }
