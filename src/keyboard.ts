@@ -59,6 +59,7 @@ const AllSuggestions = GObject.registerClass(
 		private keyboardBoxNotifyWidthId = 0;
 		private lastScrollY: null | number = null;
 		private panGesture: Clutter.PanGesture | null = null;
+		private panUpdateId: number = 0;
 		private pressStartY: null | number = null;
 		private scrollDragging = false;
 		// end-remove
@@ -101,11 +102,14 @@ const AllSuggestions = GObject.registerClass(
 			this.panGesture.set_pan_axis(Clutter.PanAxis.Y);
 			this.panGesture.set_begin_threshold(10);
 
-			this.panGesture.connect("pan-update", (action: Clutter.PanGesture) => {
-				const delta = action.get_delta();
-				const adjustment = this.get_vadjustment();
-				adjustment.value -= delta.get_y();
-			});
+			this.panUpdateId = this.panGesture.connect(
+				"pan-update",
+				(action: Clutter.PanGesture) => {
+					const delta = action.get_delta();
+					const adjustment = this.get_vadjustment();
+					adjustment.value -= delta.get_y();
+				},
+			);
 
 			this.add_action(this.panGesture);
 		}
@@ -132,6 +136,8 @@ const AllSuggestions = GObject.registerClass(
 			this.resetSuggestionPointerState();
 
 			if (this.panGesture != null) {
+				this.panGesture.disconnect(this.panUpdateId);
+				this.panUpdateId = 0;
 				this.remove_action(this.panGesture);
 				this.panGesture = null;
 			}

@@ -95,10 +95,15 @@ export const InputPanel = GObject.registerClass(
 				return;
 			}
 			this.kimpanel = null;
+			this.layout?.destroy();
 			this.layout = null;
+			this.upperLayout?.destroy();
 			this.upperLayout = null;
+			this.lookupTableLayout?.destroy();
 			this.lookupTableLayout = null;
+			this.auxText?.destroy();
 			this.auxText = null;
+			this.preeditText?.destroy();
 			this.preeditText = null;
 			this.panel?.destroy();
 			this.panel = null;
