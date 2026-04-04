@@ -1,0 +1,23 @@
+# Release Drafter 設定 — https://github.com/release-drafter/release-drafter
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+exclude-labels:
+  - ignore-for-release
+
+categories:
+  - title: Breaking Changes 🛠
+    labels:
+      - breaking-change
+  - title: Bug Fixes 🐛
+    labels:
+      - bug
+  - title: Features 🚀
+    labels:
+      - feature
+  - title: Documentation 📚
+    labels:
+      - documentation
+  - title: Other Changes

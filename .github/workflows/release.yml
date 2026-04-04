@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install pack dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext libglib2.0-bin gnome-shell
+
+      - name: Build extension zip
+        run: make pack
+
+      - name: Publish release (Release Drafter)
+        uses: release-drafter/release-drafter@v7
+        with:
+          config-name: release.yml
+          publish: true
+          tag: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload extension zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" *.shell-extension.zip --clobber
