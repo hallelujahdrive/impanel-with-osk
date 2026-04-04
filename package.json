@@ -1,6 +1,6 @@
 {
 	"name": "impanel-with-osk",
-	"version": "7.0.0",
+	"version": "8.0.0",
 	"author": "hallelujahdrive",
 	"main": "extension.js",
 	"devDependencies": {
