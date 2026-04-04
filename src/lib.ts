@@ -74,8 +74,42 @@ export const createMenuItem = (property: MenuItemProperty) => {
 	return item;
 };
 
-export const getTextStyle = (settings: Gio.Settings | null): string => {
-	const fontString = settings?.get_string("font") || "Sans 11";
+export const getPanelTextStyle = (settings: Gio.Settings | null): string => {
+	const fontString = settings?.get_string("panel-font") || "Sans 11";
+	return getTextStyleHelper(fontString);
+};
+
+export const getOskSuggestionsTextStyle = (
+	settings: Gio.Settings | null,
+): string => {
+	const fontString =
+		settings?.get_string("osk-suggestions-font") || "Sans Bold 12";
+	return getTextStyleHelper(fontString);
+};
+
+export const keyboardIsVisible = (): boolean => {
+	return Main.keyboard._keyboard?.visible ?? false;
+};
+
+export const isLookupTableVertical = (
+	settings: Gio.Settings | null,
+): boolean => {
+	return settings?.get_boolean("panel-vertical") ?? false;
+};
+
+export const extractLabelString = (label: string): string => {
+	if (
+		label.length >= 2 &&
+		label.charCodeAt(0) < 127 &&
+		label.charCodeAt(1) < 127
+	) {
+		return label.substring(0, 2);
+	}
+
+	return label.substring(0, 1);
+};
+
+const getTextStyleHelper = (fontString: string): string => {
 	const desc = Pango.FontDescription.from_string(fontString);
 
 	const fontFamily = desc.get_family();
@@ -97,22 +131,4 @@ export const getTextStyle = (settings: Gio.Settings | null): string => {
 	}
 
 	return `font-family:'${fontFamily}';font-size:${fontSize};font-style:${fontStyle};font-weight:${fontWeight}`;
-};
-
-export const keyboardIsVisible = (): boolean => {
-	return Main.keyboard._keyboard?.visible ?? false;
-};
-
-export const isLookupTableVertical = (
-	settings: Gio.Settings | null,
-): boolean => {
-	return settings?.get_boolean("vertical") ?? false;
-};
-
-export const extractLabelString = (l: string): string => {
-	if (l.length >= 2 && l.charCodeAt(0) < 127 && l.charCodeAt(1) < 127) {
-		return l.substring(0, 2);
-	}
-
-	return l.substring(0, 1);
 };

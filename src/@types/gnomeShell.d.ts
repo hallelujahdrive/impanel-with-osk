@@ -108,11 +108,11 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	import type * as Signals from "@girs/gnome-shell/misc/signals";
 	import type * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keyboard.js";
 	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
-	import type Clutter from "@girs/clutter-14";
-	import type Graphene from "@girs/graphene-1.0";
-	import type Meta from "@girs/meta-14";
-	import type Mtk from "@girs/mtk-14";
-	import type St from "@girs/st-14";
+	import type Clutter from "gi://Clutter";
+	import type Graphene from "gi://Graphene";
+	import type Meta from "gi://Meta";
+	import type Mtk from "gi://Mtk";
+	import type St from "gi://St";
 
 	export * from "@girs/gnome-shell/ui/keyboard";
 
@@ -163,30 +163,22 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 
 	interface Suggestions extends St.BoxLayout {
 		add(word: string, callback: () => void): void;
-		add_child(child: unknown): void;
 
 		clear(): void;
-		get_child_at_index(index: number): Clutter.Actor | null;
-		get_children(): Clutter.Actor[];
 		height: number;
-		lastChild: Clutter.Actor | null;
-		remove_child(child: unknown): void;
-		set_width(width: number): void;
-		set_x_align(align: Clutter.ActorAlign): void;
 		setVisible(visible: boolean): void;
-		width: number;
 	}
 
 	class LanguageSelectionPopup extends PopupMenu.PanelMenu {
-		actor: St.Widget;
+		actor: Clutter.Actor;
 
-		_onCapturedEvent(actor, event): boolean;
+		_onCapturedEvent(actor: Clutter.Actor, event: Clutter.Event): boolean;
 
-		close(animate): void;
+		close(animate: BoxPointer.PopupAnimation): void;
 
 		destroy(): void;
 
-		open(animate): void;
+		open(animate: BoxPointer.PopupAnimation): void;
 	}
 
 	export class Keyboard extends St.BoxLayout {
