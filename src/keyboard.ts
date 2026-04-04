@@ -73,6 +73,7 @@ const AllSuggestions = GObject.registerClass(
 			});
 
 			this.candidateContainer = new St.BoxLayout({
+				style: this.kimpanel.getOskSuggestionsTextStyle(),
 				styleClass: "word-suggestions word-all-suggestions",
 				vertical: true,
 				xAlign: Clutter.ActorAlign.FILL,
@@ -222,6 +223,10 @@ const AllSuggestions = GObject.registerClass(
 				(this.get_parent() as Clutter.Actor | null)?.queue_relayout();
 				return GLib.SOURCE_REMOVE;
 			});
+		}
+
+		public updateFont(textStyle: string): void {
+			this.candidateContainer?.set_style(textStyle);
 		}
 
 		private applyScrollStepFromY(y: number): void {
@@ -561,6 +566,11 @@ export const Keyboard = GObject.registerClass(
 			suggestions.set_x_align(Clutter.ActorAlign.START);
 		}
 
+		public updateFont(textStyle: string): void {
+			Main.keyboard._keyboard?._suggestions?.set_style(textStyle);
+			this.allSuggestions?.updateFont(textStyle);
+		}
+
 		public updateProperty(value: string): void {
 			if (this.toggleIMKeySet == null) return;
 
@@ -857,6 +867,10 @@ export const Keyboard = GObject.registerClass(
 			if (destroyed) {
 				Main.keyboard._keyboard = new KeyboardBase.Keyboard();
 			}
+
+			Main.keyboard._keyboard?._suggestions?.set_style(
+				this.kimpanel.getOskSuggestionsTextStyle(),
+			);
 
 			this.ensureOskKeyboardPatched();
 

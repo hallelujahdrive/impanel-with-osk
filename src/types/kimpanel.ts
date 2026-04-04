@@ -1,7 +1,8 @@
 import type GObject from "gi://GObject";
 
 export interface IKimPanel extends GObject.Object {
-	getTextStyle(): string;
+	getOskSuggestionsTextStyle(): string;
+	getPanelTextStyle(): string;
 	h: number;
 	isLookupTableVertical(): boolean;
 	lookupPageDown(): void;

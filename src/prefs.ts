@@ -14,34 +14,58 @@ export default class IMPanelWithOSKExtensionPreferences extends ExtensionPrefere
 
 		const page = new Adw.PreferencesPage({});
 
-		const group = new Adw.PreferencesGroup();
-		page.add(group);
+		const imPanelGroup = new Adw.PreferencesGroup({
+			title: _("IM Panel"),
+		});
+		page.add(imPanelGroup);
 
 		const switchRow = new Adw.SwitchRow({
 			title: _("Vertical List"),
 		});
 
 		window._settings.bind(
-			"vertical",
+			"panel-vertical",
 			switchRow,
 			"active",
 			Gio.SettingsBindFlags.DEFAULT,
 		);
-		group.add(switchRow);
+		imPanelGroup.add(switchRow);
 
-		const button = new Gtk.FontButton();
-		const fontRow = new Adw.ActionRow({
-			activatable_widget: button,
+		const panelFontButton = new Gtk.FontButton({
+			valign: Gtk.Align.CENTER,
+		});
+		const panelFontRow = new Adw.ActionRow({
+			activatable_widget: panelFontButton,
 			title: _("Font"),
 		});
 		window._settings.bind(
-			"font",
-			button,
+			"panel-font",
+			panelFontButton,
 			"font",
 			Gio.SettingsBindFlags.DEFAULT,
 		);
-		fontRow.add_suffix(button);
-		group.add(fontRow);
+		panelFontRow.add_suffix(panelFontButton);
+		imPanelGroup.add(panelFontRow);
+
+		const oskSuggestionsGroup = new Adw.PreferencesGroup({
+			title: _("OSK Suggestions"),
+		});
+		page.add(oskSuggestionsGroup);
+		const oskSuggestionsFontButton = new Gtk.FontButton({
+			valign: Gtk.Align.CENTER,
+		});
+		const oskSuggestionsFontRow = new Adw.ActionRow({
+			activatable_widget: oskSuggestionsFontButton,
+			title: _("Font"),
+		});
+		window._settings.bind(
+			"osk-suggestions-font",
+			oskSuggestionsFontButton,
+			"font",
+			Gio.SettingsBindFlags.DEFAULT,
+		);
+		oskSuggestionsFontRow.add_suffix(oskSuggestionsFontButton);
+		oskSuggestionsGroup.add(oskSuggestionsFontRow);
 
 		window.add(page);
 	}

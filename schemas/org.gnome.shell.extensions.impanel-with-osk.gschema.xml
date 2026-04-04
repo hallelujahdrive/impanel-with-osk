@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <schemalist>
   <schema path="/org/gnome/shell/extensions/impabel-with-osk/" id="org.gnome.shell.extensions.impanel-with-osk">
-    <key type="b" name="vertical">
+    <key type="b" name="panel-vertical">
         <default>false</default>
         <summary>vertical candidate text</summary>
         <description>whether to show candidate text vertically in panel.</description>
     </key>
-    <key type="s" name="font">
+    <key type="s" name="panel-font">
         <default>'Sans 11'</default>
         <summary>Font of input and candidate text panel</summary>
         <description>Set font of kimpanel input and candidate text.</description>
+    </key>
+    <key type="s" name="osk-suggestions-font">
+        <default>'Sans 11'</default>
+        <summary>Font of OSK suggestions</summary>
+        <description>Set font of OSK suggestions.</description>
     </key>
   </schema>
 </schemalist>

@@ -72,7 +72,7 @@ export const InputPanel = GObject.registerClass(
 
 			this.layout.add_child(this.upperLayout);
 
-			this.text_style = this.kimpanel.getTextStyle();
+			this.text_style = this.kimpanel.getPanelTextStyle();
 			this.auxText = createLabel({
 				style: this.text_style,
 				style_class: "kimpanel-label",

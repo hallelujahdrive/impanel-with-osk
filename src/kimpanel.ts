@@ -90,13 +90,15 @@ export const Kimpanel = GObject.registerClass(
 		public currentService: string;
 		public dbusSignal: number;
 		public enabled!: boolean;
-		public fontSignal: number;
 		public h!: number;
 		public helperOwnerId: number;
 		public indicator: null | typeof KimIndicator.prototype;
 		public keyboard: null | typeof Keyboard.prototype;
 		public menu: null | typeof KimMenu.prototype;
+		public oskSuggestionsFontSignal: number;
 		public ownerId: number;
+		public panelFontSignal: number;
+		public panelVerticalSignal: number;
 		public pos!: number;
 		public preedit!: string;
 		public relative!: boolean;
@@ -105,7 +107,6 @@ export const Kimpanel = GObject.registerClass(
 		public showAux!: boolean;
 		public showLookupTable!: boolean;
 		public showPreedit!: boolean;
-		public verticalSignal: number;
 		public w!: number;
 		public watchId: number;
 		public x!: number;
@@ -139,12 +140,23 @@ export const Kimpanel = GObject.registerClass(
 			this.keyboard = new Keyboard(this, dir);
 			this.menu = new KimMenu({ kimpanel: this, sourceActor: this.indicator });
 
-			this.verticalSignal = this.settings.connect("changed::vertical", () =>
-				this.inputPanel?.setVertical(this.isLookupTableVertical()),
+			this.panelVerticalSignal = this.settings.connect(
+				"changed::panel-vertical",
+				() => this.inputPanel?.setVertical(this.isLookupTableVertical()),
 			);
 
-			this.fontSignal = this.settings.connect("changed::font", () =>
-				this.inputPanel?.updateFont(this.getTextStyle()),
+			this.panelFontSignal = this.settings.connect(
+				"changed::panel-font",
+				() => {
+					this.inputPanel?.updateFont(this.getPanelTextStyle());
+				},
+			);
+
+			this.oskSuggestionsFontSignal = this.settings.connect(
+				"changed::osk-suggestions-font",
+				() => {
+					this.keyboard?.updateFont(this.getOskSuggestionsTextStyle());
+				},
 			);
 
 			this.addToShell();
@@ -184,8 +196,9 @@ export const Kimpanel = GObject.registerClass(
 				this.watchId = 0;
 				this.currentService = "";
 			}
-			this.settings?.disconnect(this.verticalSignal);
-			this.settings?.disconnect(this.fontSignal);
+			this.settings?.disconnect(this.panelVerticalSignal);
+			this.settings?.disconnect(this.panelFontSignal);
+			this.settings?.disconnect(this.oskSuggestionsFontSignal);
 			this.settings = null;
 			this.conn?.signal_unsubscribe(this.dbusSignal);
 			this.conn = null;
@@ -213,8 +226,12 @@ export const Kimpanel = GObject.registerClass(
 			this.impl?.emit_signal(signal, EMPTY_VARIANT);
 		}
 
-		public getTextStyle(): string {
-			return Lib.getTextStyle(this.settings);
+		public getOskSuggestionsTextStyle(): string {
+			return Lib.getOskSuggestionsTextStyle(this.settings);
+		}
+
+		public getPanelTextStyle(): string {
+			return Lib.getPanelTextStyle(this.settings);
 		}
 
 		public isLookupTableVertical(): boolean {
