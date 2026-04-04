@@ -13,11 +13,11 @@ categories:
       - breaking-change
   - title: Bug Fixes 🐛
     labels:
-      - bug
+      - fix
   - title: Features 🚀
     labels:
-      - feature
+      - feat
   - title: Documentation 📚
     labels:
-      - documentation
+      - doc
   - title: Other Changes
