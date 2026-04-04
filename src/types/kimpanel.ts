@@ -4,7 +4,7 @@ export interface IKimPanel extends GObject.Object {
 	getOskSuggestionsTextStyle(): string;
 	getPanelTextStyle(): string;
 	h: number;
-	isLookupTable(): boolean;
+	isLookupTableVertical(): boolean;
 	lookupPageDown(): void;
 	lookupPageUp(): void;
 	relative: boolean;
