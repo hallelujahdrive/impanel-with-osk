@@ -105,14 +105,14 @@ declare module "resource:///org/gnome/shell/ui/status/keyboard.js" {
 }
 
 declare module "resource:///org/gnome/shell/ui/keyboard.js" {
-	import type * as Signals from "@girs/gnome-shell/misc/signals";
-	import type * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keyboard.js";
-	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 	import type Clutter from "gi://Clutter";
 	import type Graphene from "gi://Graphene";
 	import type Meta from "gi://Meta";
 	import type Mtk from "gi://Mtk";
 	import type St from "gi://St";
+	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+	import type * as InputSourceManager from "resource:///org/gnome/shell/ui/status/keyboard.js";
+	import type * as Signals from "@girs/gnome-shell/misc/signals";
 
 	export * from "@girs/gnome-shell/ui/keyboard";
 
@@ -358,8 +358,8 @@ declare module "resource:///org/gnome/shell/ui/popupMenu.js" {
 
 declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 	import type Clutter from "gi://Clutter";
-	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 	import type St from "gi://St";
+	import type * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 
 	interface Keyboard extends St.BoxLayout {
 		__kimpanelLanguagePopup: null | PopupMenu.PopupMenu;

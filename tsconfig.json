@@ -6,6 +6,7 @@
 		"outDir": "./build",
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
+		"rootDir": "src",
 		"sourceMap": false,
 		"strict": true,
 		"target": "ES2022",

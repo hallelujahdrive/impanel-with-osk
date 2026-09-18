@@ -7,40 +7,42 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import type { MenuItemProperty } from "./types/menuItem.js";
 
+class KimMenuItemClass extends PopupMenu.PopupBaseMenuItem {
+	// begin-remove
+	public key!: string;
+	public label: St.Label;
+	public menuItemActivateId!: number;
+	public menuItemDestroyId!: number;
+
+	private _icon: St.Icon;
+	// end-remove
+	constructor(
+		text: string,
+		iconName: string,
+		params?: Partial<PopupMenu.PopupBaseMenuItem.ConstructorProps>,
+	) {
+		super(params);
+
+		this.label = new St.Label({ text });
+		this._icon = new St.Icon({
+			style_class: "popup-menu-icon",
+			x_align: Clutter.ActorAlign.END,
+		});
+		this.add_child(this._icon);
+		this.add_child(this.label);
+
+		this.setIcon(iconName);
+	}
+
+	setIcon(name: string): void {
+		const icon = createIcon(name);
+		if (icon != null) this._icon.gicon = icon;
+	}
+}
+
 export const KimMenuItem = GObject.registerClass(
-	class KimMenuItem extends PopupMenu.PopupBaseMenuItem {
-		// begin-remove
-		public key!: string;
-		public label: St.Label;
-		public menuItemActivateId!: number;
-		public menuItemDestroyId!: number;
-
-		private _icon: St.Icon;
-		// end-remove
-		constructor(
-			text: string,
-			iconName: string,
-			params?: Partial<PopupMenu.PopupBaseMenuItem.ConstructorProps>,
-		) {
-			super(params);
-
-			this.label = new St.Label({ text });
-			this._icon = new St.Icon({
-				style_class: "popup-menu-icon",
-				x_align: Clutter.ActorAlign.END,
-			});
-			this.add_child(this._icon);
-			this.add_child(this.label);
-
-			this.setIcon(iconName);
-		}
-
-		setIcon(name: string): void {
-			const icon = createIcon(name);
-			if (icon != null) this._icon.gicon = icon;
-		}
-	},
-);
+	KimMenuItemClass,
+) as unknown as typeof KimMenuItemClass;
 
 export const parseProperty = (str: string): MenuItemProperty => {
 	const p = str.split(":");

@@ -44,7 +44,6 @@ This extension is based on [gnome-shell-extension-kimpanel](https://github.com/w
 
 ## Usage
 
-
 This extension uses the kimpanel interface and cannot be used at the same time as [gnome-shell-extension-kimpanel](https://github.com/wengxt/gnome-shell-extension-kimpanel). If you are using gnome-shell-extension-kimpanel, be sure to disable it.
 
 1. Open GNOME Extension Manager.

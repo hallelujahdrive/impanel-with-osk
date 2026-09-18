@@ -497,9 +497,10 @@ export const Keyboard = GObject.registerClass(
 
 				const width = Main.keyboard._keyboard?._suggestions?.width ?? 0;
 				if (width > containerWidth) {
-					Main.keyboard._keyboard?._suggestions?.remove_child(
-						Main.keyboard._keyboard._suggestions.lastChild,
-					);
+					const lastChild = Main.keyboard._keyboard?._suggestions?.lastChild;
+					if (lastChild != null) {
+						Main.keyboard._keyboard?._suggestions?.remove_child(lastChild);
+					}
 					break;
 				}
 			}
