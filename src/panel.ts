@@ -197,7 +197,7 @@ export const InputPanel = GObject.registerClass(
 		}
 
 		public setLookupTableCursor(cursor: number): void {
-			(this.lookupTableLayout?.get_children() as Label[]).forEach(
+			(this.lookupTableLayout?.get_children() as Label[])?.forEach(
 				(label, i) => {
 					if (i === cursor) {
 						label.add_style_pseudo_class("active");
