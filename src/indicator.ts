@@ -86,16 +86,7 @@ class KimIndicatorClass extends PanelMenu.Button {
 		super.destroy();
 	}
 
-	public updateProperties(properties?: string[]) {
-		if (properties == null) {
-			for (const key in this.propertySwitch) {
-				const property = this.properties[key];
-				const item = this.propertySwitch[key];
-				item.setIcon(property.icon);
-				item.label.text = property.label;
-			}
-			return;
-		}
+	public updateProperties(properties: string[]) {
 		const _properties = Object.fromEntries(
 			properties.map((value) => {
 				const [key, ...frags] = value.split(":");
@@ -135,7 +126,7 @@ class KimIndicatorClass extends PanelMenu.Button {
 		}
 		const key = property.key;
 		this.properties[key] = property;
-		this.updateProperties();
+		if (key in this.propertySwitch) this.updatePropertyItem(key);
 	}
 
 	private addPropertyItem(key: string): void {
@@ -185,7 +176,8 @@ class KimIndicatorClass extends PanelMenu.Button {
 			this.labelIcon.visible = true;
 		} else {
 			const gicon = createIcon(iconName);
-			if (gicon != null) this.mainIcon.gicon = gicon;
+			if (gicon != null && this.mainIcon.gicon !== gicon)
+				this.mainIcon.gicon = gicon;
 			this.mainIcon.visible = true;
 			this.labelIcon.visible = false;
 		}

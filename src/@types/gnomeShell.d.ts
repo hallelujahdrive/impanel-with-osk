@@ -387,6 +387,7 @@ declare module "resource:///org/gnome/shell/ui/keyboard.js" {
 		add_child(child: unknown): void;
 		get_child_at_index(index: number): Clutter.Actor | null;
 		get_children(): Clutter.Actor[];
+		get_n_children(): number;
 		height: number;
 		lastChild: Clutter.Actor | null;
 		remove_child(child: unknown): void;
@@ -406,4 +407,14 @@ declare module "resource:///org/gnome/shell/ui/main.js" {
 	import type { KeyboardManager } from "resource:///org/gnome/shell/ui/keyboard.js";
 
 	export const keyboard: KeyboardManager;
+}
+
+declare module "@girs/shell-18" {
+	import type Meta from "gi://Meta";
+
+	export namespace Shell {
+		interface Global {
+			backend: Meta.Backend;
+		}
+	}
 }

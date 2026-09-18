@@ -36,7 +36,7 @@ class KimMenuItemClass extends PopupMenu.PopupBaseMenuItem {
 
 	setIcon(name: string): void {
 		const icon = createIcon(name);
-		if (icon != null) this._icon.gicon = icon;
+		if (icon != null && this._icon.gicon !== icon) this._icon.gicon = icon;
 	}
 }
 
@@ -56,18 +56,21 @@ export const parseProperty = (str: string): MenuItemProperty => {
 	return property;
 };
 
+const iconCache = new Map<string, Gio.Icon>();
+
 export const createIcon = (name: string): Gio.Icon | undefined => {
 	if (!name) return undefined;
 
-	// biome-ignore lint/suspicious/noDoubleEquals: GIR API
-	if (name[0] == "/") {
-		return Gio.FileIcon.new(Gio.File.new_for_path(name));
-	}
-	// this is to hack through the gtk silly icon theme code.
-	// gtk doesn't want to mix symbolic icon and normal icon together,
-	// while in our case, it's much better to show an icon instead of
-	// hide everything.
-	return Gio.ThemedIcon.new_with_default_fallbacks(`${name}-symbolic-hack`);
+	const cached = iconCache.get(name);
+	if (cached != null) return cached;
+
+	const icon =
+		name[0] === "/"
+			? Gio.FileIcon.new(Gio.File.new_for_path(name))
+			: Gio.ThemedIcon.new_with_default_fallbacks(`${name}-symbolic-hack`);
+
+	iconCache.set(name, icon);
+	return icon;
 };
 
 export const createMenuItem = (property: MenuItemProperty) => {
