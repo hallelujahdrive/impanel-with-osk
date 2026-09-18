@@ -11,20 +11,12 @@ export interface IKimPanel extends GObject.Object {
 	scale: number;
 	selectCandidate(arg?: number): void;
 	selectCandidateText(arg: string): void;
-
 	showAux: boolean;
-
 	showLookupTable: boolean;
-
 	showPreedit: boolean;
-
 	toggleIM(): void;
-
 	triggerProperty(arg: string): void;
-
 	w: number;
-
 	x: number;
-
 	y: number;
 }
