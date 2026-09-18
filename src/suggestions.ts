@@ -43,6 +43,7 @@ export class SuggestionsManager {
 		this.selectCandidateHelp(this.texts);
 	}
 
+	/** @returns true when the OSK should render (full list ready, or cleared). */
 	public setLookupTable(
 		labels: string[],
 		texts: string[],
@@ -51,7 +52,7 @@ export class SuggestionsManager {
 		hasNext: boolean,
 		cursor: number,
 		layout: number,
-	): void {
+	): boolean {
 		if (labels.length === 0 || labels.every((label) => label === "")) {
 			this.reset();
 		}
@@ -64,24 +65,25 @@ export class SuggestionsManager {
 		this.texts = texts;
 
 		if (labels.length === 0) {
-			return;
+			return true;
 		}
 
 		switch (this.status) {
 			case "default": {
-				if (this.locked) return;
+				if (this.locked) return false;
 				if (keyboardIsVisible()) {
 					this.allTexts.push(...texts.map((text) => text.split("\n")[0]));
 					if (hasNext) {
 						this.kimpanel.lookupPageDown();
-					} else {
-						// reset cursor
-						this.status = "reset";
-						this.locked = true;
-						this.kimpanel.lookupPageUp();
+						return false;
 					}
+					// reset cursor
+					this.status = "reset";
+					this.locked = true;
+					this.kimpanel.lookupPageUp();
+					return true;
 				}
-				return;
+				return false;
 			}
 			case "reset":
 				if (hasPrev) {
@@ -89,11 +91,11 @@ export class SuggestionsManager {
 				} else {
 					this.status = "default";
 				}
-				return;
+				return false;
 			case "search":
 			case "searchReverse":
 				this.selectCandidateHelp(texts);
-				return;
+				return false;
 		}
 	}
 

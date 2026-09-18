@@ -1,7 +1,6 @@
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import GObject from "gi://GObject";
-import Meta from "gi://Meta";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { KimIndicator } from "./indicator.js";
 import { Keyboard } from "./keyboard.js";
@@ -11,8 +10,25 @@ import { InputPanel } from "./panel.js";
 import { SuggestionsManager } from "./suggestions.js";
 import type { IKimPanel } from "./types/kimpanel.js";
 
+type InputPanelUpdateFlags = {
+	aux?: boolean;
+	lookupCursor?: boolean;
+	lookupTable?: boolean;
+	position?: boolean;
+	preedit?: boolean;
+};
+
 // biome-ignore lint/suspicious/noExplicitAny: GIR callback signature
 const EMPTY_VARIANT = null as unknown as GLib.Variant<any>;
+
+const unpackBool = (param: GLib.Variant): boolean =>
+	param.get_child_value(0).get_boolean();
+
+const unpackInt = (param: GLib.Variant, index = 0): number =>
+	param.get_child_value(index).get_int32();
+
+const unpackStr = (param: GLib.Variant, index = 0): string =>
+	param.get_child_value(index).unpack() as string;
 
 const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
 const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
@@ -241,7 +257,7 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		LockXkbGroup(idx: number) {
-			new Meta.Context().get_backend().lock_layout_group(idx);
+			global.backend.lock_layout_group(idx);
 		}
 
 		public lookupPageDown(): void {
@@ -271,22 +287,27 @@ export const Kimpanel = GObject.registerClass(
 			cursor: number,
 			layout: number,
 		): void {
-			this.suggestionsManager?.setLookupTable(
-				labels,
-				texts,
-				attrs,
-				hasPrev,
-				hasNext,
-				cursor,
-				layout,
-			);
+			const shouldRenderSuggestions =
+				this.suggestionsManager?.setLookupTable(
+					labels,
+					texts,
+					attrs,
+					hasPrev,
+					hasNext,
+					cursor,
+					layout,
+				) ?? false;
 
 			if (Lib.keyboardIsVisible()) {
-				if (this.suggestionsManager != null)
+				if (shouldRenderSuggestions && this.suggestionsManager != null)
 					this.keyboard?.setSuggestions(this.suggestionsManager.allTexts);
 			} else {
 				this.inputPanel?.setVertical(this.isLookupTableVertical());
-				this.updateInputPanel();
+				this.updateInputPanel({
+					lookupCursor: true,
+					lookupTable: true,
+					position: true,
+				});
 			}
 		}
 
@@ -366,10 +387,16 @@ export const Kimpanel = GObject.registerClass(
 			if (this.isDestroyed) {
 				return;
 			}
-			let changed = false;
+
+			let dirty: InputPanelUpdateFlags | null = null;
+			const mark = (flags: InputPanelUpdateFlags) => {
+				if (dirty == null) dirty = { ...flags };
+				else Object.assign(dirty, flags);
+			};
+
 			switch (signal) {
 				case "Enable": {
-					const [value] = param.deepUnpack<[boolean]>();
+					const value = unpackBool(param);
 
 					this.enabled = value;
 					if (this.enabled) this.indicator?.active();
@@ -377,13 +404,13 @@ export const Kimpanel = GObject.registerClass(
 					break;
 				}
 				case "ExecMenu": {
-					const [value] = param.deepUnpack<[string[]]>();
+					const [value] = param.unpack() as [string[]];
 
 					this.menu?.execMenu(value);
 					break;
 				}
 				case "RegisterProperties": {
-					const [value] = param.deepUnpack<[string[]]>();
+					const [value] = param.unpack() as [string[]];
 
 					if (sender != null && this.currentService !== sender) {
 						this.currentService = sender;
@@ -402,56 +429,75 @@ export const Kimpanel = GObject.registerClass(
 					break;
 				}
 				case "ShowAux": {
-					const [value] = param.deepUnpack<[boolean]>();
+					const value = unpackBool(param);
 
-					if (this.showAux !== value) changed = true;
+					if (this.showAux !== value) {
+						mark({ aux: true, position: true });
+						if (!this.showPreedit) mark({ preedit: true });
+						if (!this.showLookupTable) mark({ lookupTable: true });
+					}
 					this.showAux = value;
 					break;
 				}
 				case "ShowLookupTable": {
-					const [value] = param.deepUnpack<[boolean]>();
+					const value = unpackBool(param);
 
-					if (this.showLookupTable !== value) changed = true;
+					if (this.showLookupTable !== value)
+						mark({
+							lookupCursor: true,
+							lookupTable: true,
+							position: true,
+						});
 					this.showLookupTable = value;
 					break;
 				}
 				case "ShowPreedit": {
-					const [value] = param.deepUnpack<[boolean]>();
+					const value = unpackBool(param);
 
-					if (this.showPreedit !== value) changed = true;
+					if (this.showPreedit !== value) {
+						mark({ position: true, preedit: true });
+						if (!this.showLookupTable) mark({ lookupTable: true });
+					}
 					this.showPreedit = value;
 					break;
 				}
 				case "UpdateAux": {
-					const value = param.deepUnpack<[string, string]>();
+					const text = unpackStr(param, 0);
 
-					if (this.aux !== value[0]) changed = true;
-					this.aux = value[0];
+					if (this.aux !== text) {
+						mark({ aux: true, position: true });
+						if (!this.showPreedit) mark({ preedit: true });
+						if (!this.showLookupTable) mark({ lookupTable: true });
+					}
+					this.aux = text;
 					break;
 				}
 				case "UpdateLookupTableCursor": {
-					const [value] = param.deepUnpack<[number]>();
+					const value = unpackInt(param);
 
-					if (this.pos !== value) changed = true;
-					if (this.suggestionsManager) this.suggestionsManager.cursor = value;
+					if (this.suggestionsManager == null) break;
+					if (this.suggestionsManager.cursor !== value) {
+						this.suggestionsManager.cursor = value;
+						mark({ lookupCursor: true });
+					}
 					break;
 				}
 				case "UpdatePreeditCaret": {
-					const [value] = (param as GLib.Variant).deepUnpack<[number]>();
+					const value = unpackInt(param);
 
-					if (this.pos !== value) changed = true;
+					if (this.pos !== value) mark({ preedit: true });
 					this.pos = value;
 					break;
 				}
 				case "UpdatePreeditText": {
-					const value = param.deepUnpack<[string, string]>();
+					const text = unpackStr(param, 0);
 
-					if (this.preedit !== value[0]) changed = true;
-					this.preedit = value[0];
+					if (this.preedit !== text) mark({ position: true, preedit: true });
+					this.preedit = text;
 					break;
 				}
 				case "UpdateProperty": {
-					const [value] = param.deepUnpack<[string]>();
+					const value = unpackStr(param);
 
 					this.indicator?.updateProperty(value);
 					this.keyboard?.updateProperty(value);
@@ -460,23 +506,19 @@ export const Kimpanel = GObject.registerClass(
 					break;
 				}
 				case "UpdateSpotLocation": {
-					const value = param.deepUnpack<[number, number]>();
+					const x = unpackInt(param);
+					const y = unpackInt(param, 1);
 
-					if (
-						this.x !== value[0] ||
-						this.y !== value[1] ||
-						this.w !== 0 ||
-						this.h !== 0
-					)
-						changed = true;
-					this.x = value[0];
-					this.y = value[1];
+					if (this.x !== x || this.y !== y || this.w !== 0 || this.h !== 0)
+						mark({ position: true });
+					this.x = x;
+					this.y = y;
 					this.w = 0;
 					this.h = 0;
 					break;
 				}
 			}
-			if (changed) this.updateInputPanel();
+			if (dirty != null) this.updateInputPanel(dirty);
 		}
 
 		private requestNameFinished(): void {
@@ -527,34 +569,46 @@ export const Kimpanel = GObject.registerClass(
 			this.h = h;
 			this.relative = relative;
 			this.scale = scale;
-			this.updateInputPanel();
+			this.updateInputPanel({ position: true });
 		}
 
-		private updateInputPanel(): void {
+		private updateInputPanel(flags?: InputPanelUpdateFlags): void {
 			if (Lib.keyboardIsVisible()) return;
 
-			if (this.showAux) {
-				this.inputPanel?.setAuxText(this.aux);
-			} else {
-				this.inputPanel?.hideAux();
+			const all = flags == null;
+
+			if (all || flags.aux) {
+				if (this.showAux) {
+					this.inputPanel?.setAuxText(this.aux);
+				} else {
+					this.inputPanel?.hideAux();
+				}
 			}
-			if (this.showPreedit) {
-				this.inputPanel?.setPreeditText(this.preedit, this.pos);
-			} else {
-				this.inputPanel?.hidePreedit();
+			if (all || flags.preedit) {
+				if (this.showPreedit) {
+					this.inputPanel?.setPreeditText(this.preedit, this.pos);
+				} else {
+					this.inputPanel?.hidePreedit();
+				}
 			}
 
-			this.inputPanel?.setLookupTable(
-				this.suggestionsManager?.labels ?? [],
-				this.suggestionsManager?.texts ?? [],
-				this.showLookupTable,
-			);
+			if (all || flags.lookupTable) {
+				this.inputPanel?.setLookupTable(
+					this.suggestionsManager?.labels ?? [],
+					this.suggestionsManager?.texts ?? [],
+					this.showLookupTable,
+				);
+			}
 
-			this.inputPanel?.setLookupTableCursor(
-				this.suggestionsManager?.cursor ?? -1,
-			);
+			if (all || flags.lookupTable || flags.lookupCursor) {
+				this.inputPanel?.setLookupTableCursor(
+					this.suggestionsManager?.cursor ?? -1,
+				);
+			}
 
-			this.inputPanel?.updatePosition();
+			if (all || flags.position) {
+				this.inputPanel?.updatePosition();
+			}
 		}
 	},
 );

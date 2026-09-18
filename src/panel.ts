@@ -40,6 +40,8 @@ export const InputPanel = GObject.registerClass(
 		public upperLayout: null | St.BoxLayout;
 
 		private arrowSide: St.Side;
+		private candidateLabels: Label[];
+		private lookupCursor: number;
 		// end-remove
 		constructor(params: { kimpanel: IKimPanel }) {
 			super();
@@ -69,6 +71,8 @@ export const InputPanel = GObject.registerClass(
 			this.lookupTableLayout = new St.BoxLayout({
 				vertical: this.kimpanel.isLookupTableVertical(),
 			});
+			this.candidateLabels = [];
+			this.lookupCursor = -1;
 
 			this.layout.add_child(this.upperLayout);
 
@@ -83,9 +87,8 @@ export const InputPanel = GObject.registerClass(
 				style_class: "kimpanel-label",
 				text: "",
 			});
-
-			this.upperLayout.add_child(this.auxText);
-			this.upperLayout.add_child(this.preeditText);
+			this.auxText.hide();
+			this.preeditText.hide();
 			this.hide();
 			this.panel.hide();
 		}
@@ -101,6 +104,8 @@ export const InputPanel = GObject.registerClass(
 			this.upperLayout = null;
 			this.lookupTableLayout?.destroy();
 			this.lookupTableLayout = null;
+			this.candidateLabels = [];
+			this.lookupCursor = -1;
 			this.auxText?.destroy();
 			this.auxText = null;
 			this.preeditText?.destroy();
@@ -112,18 +117,15 @@ export const InputPanel = GObject.registerClass(
 		}
 
 		public hideAux(): void {
-			if (this.auxText?.visible) this.auxText.hide();
+			this.unparentHiddenLabel(this.auxText);
 		}
 
 		public hidePreedit(): void {
-			if (this.preeditText?.visible) this.preeditText.hide();
+			this.unparentHiddenLabel(this.preeditText);
 		}
 
 		public setAuxText(text: string): void {
-			this.auxText?.set_text(text);
-			if (!this.auxText?.visible) {
-				this.auxText?.show();
-			}
+			this.showUpperLabel(this.auxText, text);
 		}
 
 		public setLookupTable(
@@ -131,87 +133,63 @@ export const InputPanel = GObject.registerClass(
 			table: string[],
 			visible: boolean,
 		): void {
+			const lookup = this.lookupTableLayout;
+			if (lookup == null) return;
+
 			const len = visible ? table.length : 0;
-			const labelLen = this.lookupTableLayout?.get_children().length ?? 0;
 
-			if (labelLen > 0 && len === 0) {
-				if (this.lookupTableLayout != null)
-					this.layout?.remove_child(this.lookupTableLayout);
-			} else if (labelLen === 0 && len > 0) {
-				if (this.lookupTableLayout != null)
-					this.layout?.add_child(this.lookupTableLayout);
+			while (this.candidateLabels.length < len) {
+				this.candidateLabels.push(this.createCandidateLabel());
 			}
 
-			// if number is not enough, create new
-			if (len > labelLen) {
-				for (let i = 0; i < len - labelLen; i++) {
-					const item = createLabel({
-						reactive: true,
-						style: this.text_style,
-						style_class: "popup-menu-item kimpanel-label",
-						text: "",
-					});
-					item.add_style_class_name("kimpanel-candidate-item");
-					item.candidateIndex = 0;
-					item.ignore_focus = true;
-					item.buttonReleaseId = item.connect(
-						"button-release-event",
-						(widget) => {
-							if (!widget.ignore_focus) this.candidateClicked(widget);
-						},
-					);
-					item.enterEventId = item.connect("enter-event", (widget) => {
-						if (!widget.ignore_focus) widget.add_style_pseudo_class("hover");
-					});
-					item.leaveEventId = item.connect("leave-event", (widget) => {
-						if (!widget.ignore_focus) widget.remove_style_pseudo_class("hover");
-					});
-					item.labelDestroyId = item.connect("destroy", () => {
-						if (item.buttonReleaseId != null)
-							item.disconnect(item.buttonReleaseId);
-						if (item.enterEventId != null) item.disconnect(item.enterEventId);
-						if (item.leaveEventId != null) item.disconnect(item.leaveEventId);
-						if (item.labelDestroyId != null)
-							item.disconnect(item.labelDestroyId);
-						if (item.touchId != null) item.disconnect(item.touchId);
-					});
-					this.lookupTableLayout?.add_child(item);
-				}
-			} else if (len < labelLen) {
-				// else destroy unnecessary one
-				for (let i = 0; i < labelLen - len; i++) {
-					this.lookupTableLayout?.get_children()[0].destroy();
+			for (let i = 0; i < this.candidateLabels.length; i++) {
+				const item = this.candidateLabels[i];
+				const parent = item.get_parent();
+
+				if (i < len) {
+					item.ignore_focus = label[i].length === 0;
+					item.candidateIndex = i;
+					item.text = `${label[i]}${table[i]}`;
+					item.set_width(-1);
+					if (parent !== lookup) lookup.insert_child_at_index(item, i);
+					if (!item.visible) item.show();
+				} else if (parent != null) {
+					parent.remove_child(item);
+					item.remove_style_pseudo_class("active");
+					item.hide();
 				}
 			}
 
-			// update label and text
-			const lookupTable = this.lookupTableLayout?.get_children() as Label[];
-			if (lookupTable == null) return;
-
-			for (let i = 0; i < lookupTable.length; i++) {
-				if (label[i].length === 0) lookupTable[i].ignore_focus = true;
-				else lookupTable[i].ignore_focus = false;
-				lookupTable[i].candidateIndex = i;
-				lookupTable[i].text = label[i] + table[i];
+			const attached = lookup.get_parent() === this.layout;
+			if (len === 0) {
+				if (attached) this.layout?.remove_child(lookup);
+			} else if (!attached) {
+				this.layout?.add_child(lookup);
 			}
+
+			if (this.lookupCursor >= len) this.lookupCursor = -1;
+			this.releaseWidth(lookup);
+			this.releaseWidth(this.layout);
+			this.releaseWidth(this.panel);
 		}
 
 		public setLookupTableCursor(cursor: number): void {
-			(this.lookupTableLayout?.get_children() as Label[])?.forEach(
-				(label, i) => {
-					if (i === cursor) {
-						label.add_style_pseudo_class("active");
-					} else {
-						label.remove_style_pseudo_class("active");
-					}
-				},
-			);
+			if (this.lookupCursor === cursor) return;
+
+			const previous = this.candidateLabels[this.lookupCursor];
+			if (previous != null) previous.remove_style_pseudo_class("active");
+
+			const current = this.candidateLabels[cursor];
+			if (current != null) current.add_style_pseudo_class("active");
+
+			this.lookupCursor = cursor;
 		}
 
 		public setPreeditText(text: string, pos: number): void {
-			const cat = `${text.slice(0, pos)}|${text.slice(pos)}`;
-			this.preeditText?.set_text(cat);
-			if (!this.preeditText?.visible) this.preeditText?.show();
+			this.showUpperLabel(
+				this.preeditText,
+				`${text.slice(0, pos)}|${text.slice(pos)}`,
+			);
 		}
 
 		public setVertical(vertical: boolean): void {
@@ -222,11 +200,8 @@ export const InputPanel = GObject.registerClass(
 			this.text_style = textStyle;
 			this.auxText?.set_style(this.text_style);
 			this.preeditText?.set_style(this.text_style);
-			const lookupTable = this.lookupTableLayout?.get_children();
 
-			if (lookupTable == null) return;
-
-			for (const label of lookupTable as Label[]) {
+			for (const label of this.candidateLabels) {
 				label.set_style(this.text_style);
 			}
 		}
@@ -300,20 +275,76 @@ export const InputPanel = GObject.registerClass(
 			}
 		}
 
-		private candidateClicked(
-			widget: St.Label & { candidate_index?: number },
-		): void {
-			this.kimpanel?.selectCandidate(widget.candidate_index);
+		private candidateClicked(widget: Label): void {
+			this.kimpanel?.selectCandidate(widget.candidateIndex);
+		}
+
+		private createCandidateLabel(): Label {
+			const item = createLabel({
+				reactive: true,
+				style: this.text_style,
+				style_class: "popup-menu-item kimpanel-label",
+				text: "",
+			});
+			item.add_style_class_name("kimpanel-candidate-item");
+			item.candidateIndex = 0;
+			item.ignore_focus = true;
+			item.buttonReleaseId = item.connect("button-release-event", (widget) => {
+				if (!widget.ignore_focus) this.candidateClicked(widget);
+			});
+			item.enterEventId = item.connect("enter-event", (widget) => {
+				if (!widget.ignore_focus) widget.add_style_pseudo_class("hover");
+			});
+			item.leaveEventId = item.connect("leave-event", (widget) => {
+				if (!widget.ignore_focus) widget.remove_style_pseudo_class("hover");
+			});
+			item.labelDestroyId = item.connect("destroy", () => {
+				if (item.buttonReleaseId != null) item.disconnect(item.buttonReleaseId);
+				if (item.enterEventId != null) item.disconnect(item.enterEventId);
+				if (item.leaveEventId != null) item.disconnect(item.leaveEventId);
+				if (item.labelDestroyId != null) item.disconnect(item.labelDestroyId);
+				if (item.touchId != null) item.disconnect(item.touchId);
+			});
+			return item;
 		}
 
 		private hide(): void {
 			this.panel?.close(BoxPointer.PopupAnimation.NONE);
 		}
 
+		private releaseWidth(actor: Clutter.Actor | null): void {
+			actor?.set_width(-1);
+			actor?.queue_relayout();
+		}
+
 		private show(): void {
 			if (this.cursor != null) this.panel?.setPosition(this.cursor, 0.0);
 			this.panel?.open(BoxPointer.PopupAnimation.NONE);
 			this.panel?.get_parent()?.set_child_above_sibling(this.panel, null);
+		}
+
+		private showUpperLabel(label: null | St.Label, text: string): void {
+			if (label == null || this.upperLayout == null) return;
+
+			label.set_text(text);
+			label.set_width(-1);
+			if (label.get_parent() !== this.upperLayout)
+				this.upperLayout.add_child(label);
+			if (!label.visible) label.show();
+			this.releaseWidth(this.upperLayout);
+			this.releaseWidth(this.layout);
+			this.releaseWidth(this.panel);
+		}
+
+		private unparentHiddenLabel(label: null | St.Label): void {
+			if (label == null) return;
+			if (label.visible) label.hide();
+			const parent = label.get_parent();
+			if (parent != null) parent.remove_child(label);
+			label.set_width(-1);
+			this.releaseWidth(this.upperLayout);
+			this.releaseWidth(this.layout);
+			this.releaseWidth(this.panel);
 		}
 	},
 );
