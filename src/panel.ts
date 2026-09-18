@@ -7,6 +7,7 @@ import St from "gi://St";
 import * as Params from "resource:///org/gnome/shell/misc/params.js";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import type { SpotRect } from "./inputState.js";
 import type { IKimPanel } from "./types/kimpanel.js";
 
 export class Label extends St.Label {
@@ -28,21 +29,20 @@ const createLabel = (params: Partial<St.Label.ConstructorProps>): Label => {
 
 export const InputPanel = GObject.registerClass(
 	class InputPanel extends GObject.Object {
-		// begin-remove
-		public auxText: null | St.Label;
-		public cursor: null | St.Label;
-		public kimpanel: IKimPanel | null;
-		public layout: null | St.BoxLayout;
-		public lookupTableLayout: null | St.BoxLayout;
-		public panel: BoxPointer.BoxPointer | null;
-		public preeditText: null | St.Label;
-		public text_style: string;
-		public upperLayout: null | St.BoxLayout;
+		declare public auxText: null | St.Label;
+		declare public cursor: null | St.Label;
+		declare public kimpanel: IKimPanel | null;
+		declare public layout: null | St.BoxLayout;
+		declare public lookupTableLayout: null | St.BoxLayout;
+		declare public panel: BoxPointer.BoxPointer | null;
+		declare public preeditText: null | St.Label;
+		declare public text_style: string;
+		declare public upperLayout: null | St.BoxLayout;
 
-		private arrowSide: St.Side;
-		private candidateLabels: Label[];
-		private lookupCursor: number;
-		// end-remove
+		declare private arrowSide: St.Side;
+		declare private candidateLabels: Label[];
+		declare private lookupCursor: number;
+
 		constructor(params: { kimpanel: IKimPanel }) {
 			super();
 
@@ -120,6 +120,16 @@ export const InputPanel = GObject.registerClass(
 			this.unparentHiddenLabel(this.auxText);
 		}
 
+		public hideLookup(): void {
+			const lookup = this.lookupTableLayout;
+			if (lookup == null) return;
+			const parent = lookup.get_parent();
+			if (parent == null) return;
+			parent.remove_child(lookup);
+			this.releaseWidth(this.layout);
+			this.releaseWidth(this.panel);
+		}
+
 		public hidePreedit(): void {
 			this.unparentHiddenLabel(this.preeditText);
 		}
@@ -147,10 +157,18 @@ export const InputPanel = GObject.registerClass(
 				const parent = item.get_parent();
 
 				if (i < len) {
-					item.ignore_focus = label[i].length === 0;
-					item.candidateIndex = i;
-					item.text = `${label[i]}${table[i]}`;
-					item.set_width(-1);
+					const text = `${label[i]}${table[i]}`;
+					const ignoreFocus = label[i].length === 0;
+					if (
+						item.text !== text ||
+						item.ignore_focus !== ignoreFocus ||
+						item.candidateIndex !== i
+					) {
+						item.ignore_focus = ignoreFocus;
+						item.candidateIndex = i;
+						item.text = text;
+						item.set_width(-1);
+					}
 					if (parent !== lookup) lookup.insert_child_at_index(item, i);
 					if (!item.visible) item.show();
 				} else if (parent != null) {
@@ -206,16 +224,15 @@ export const InputPanel = GObject.registerClass(
 			}
 		}
 
-		public updatePosition(): void {
-			const kimpanel = this.kimpanel;
-			if (kimpanel == null || this.panel == null) return;
+		public updatePosition(spot: SpotRect, visible: boolean): void {
+			if (this.panel == null) return;
 
-			let x = kimpanel.x;
-			let y = kimpanel.y;
-			let w = kimpanel.w;
-			let h = kimpanel.h;
+			let x = spot.x;
+			let y = spot.y;
+			let w = spot.w;
+			let h = spot.h;
 
-			if (kimpanel.relative) {
+			if (spot.relative) {
 				if (global.display.focus_window) {
 					const shellScale = St.ThemeContext.get_for_stage(
 						global.stage,
@@ -223,10 +240,10 @@ export const InputPanel = GObject.registerClass(
 					const window =
 						global.display.focus_window.get_compositor_private<Meta.WindowActor>();
 					if (window) {
-						x = window.x + x * (shellScale / kimpanel.scale);
-						y = window.y + y * (shellScale / kimpanel.scale);
-						w = w * (shellScale / kimpanel.scale);
-						h = h * (shellScale / kimpanel.scale);
+						x = window.x + x * (shellScale / spot.scale);
+						y = window.y + y * (shellScale / spot.scale);
+						w = w * (shellScale / spot.scale);
+						h = h * (shellScale / spot.scale);
 					}
 				}
 			}
@@ -264,9 +281,6 @@ export const InputPanel = GObject.registerClass(
 			this.cursor?.set_size(w === 0 ? 1 : w, h === 0 ? 1 : h);
 
 			this.panel._arrowSide = this.arrowSide;
-
-			const visible =
-				kimpanel.showAux || kimpanel.showPreedit || kimpanel.showLookupTable;
 
 			if (visible) {
 				this.show();
@@ -325,6 +339,13 @@ export const InputPanel = GObject.registerClass(
 
 		private showUpperLabel(label: null | St.Label, text: string): void {
 			if (label == null || this.upperLayout == null) return;
+			if (
+				label.text === text &&
+				label.visible &&
+				label.get_parent() === this.upperLayout
+			) {
+				return;
+			}
 
 			label.set_text(text);
 			label.set_width(-1);
@@ -338,8 +359,9 @@ export const InputPanel = GObject.registerClass(
 
 		private unparentHiddenLabel(label: null | St.Label): void {
 			if (label == null) return;
-			if (label.visible) label.hide();
 			const parent = label.get_parent();
+			if (!label.visible && parent == null) return;
+			if (label.visible) label.hide();
 			if (parent != null) parent.remove_child(label);
 			label.set_width(-1);
 			this.releaseWidth(this.upperLayout);

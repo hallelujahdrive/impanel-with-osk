@@ -9,18 +9,15 @@ import type { IKimPanel } from "./types/kimpanel.js";
 import type { MenuItemProperty } from "./types/menuItem.js";
 
 export class KimMenu extends PopupMenu.PopupMenu {
-	// begin-remove
-	public grabbed: boolean;
-	public kimpanel: IKimPanel | null;
+	declare public grabbed: boolean;
+	declare public kimpanel: IKimPanel | null;
 
-	private enterEventId!: number;
-	private eventCaptureId!: number;
-	private keyFocusNotifyId!: number;
-	private kimKeyPressId: number;
-	private leaveEventId!: number;
-	private openStateChangedId: number;
-	private propertySwitch: (typeof Lib.KimMenuItem.prototype)[];
-	// end-remove
+	declare private eventCaptureId: number;
+	declare private keyFocusNotifyId: number;
+	declare private kimKeyPressId: number;
+	declare private openStateChangedId: number;
+	declare private propertySwitch: (typeof Lib.KimMenuItem.prototype)[];
+
 	constructor(params: {
 		arrowAlignment?: number;
 		arrowSide?: St.Side;
@@ -42,6 +39,8 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			"key-press-event",
 			this.onSourceKeyPress.bind(this),
 		);
+		this.eventCaptureId = 0;
+		this.keyFocusNotifyId = 0;
 		this.grabbed = false;
 		this.propertySwitch = [];
 		this.kimpanel = _params.kimpanel;
@@ -74,17 +73,9 @@ export class KimMenu extends PopupMenu.PopupMenu {
 	}
 
 	private addPropertyItem(property: MenuItemProperty) {
-		const item = Lib.createMenuItem(property);
-
-		item.menuItemActivateId = item.connect("activate", () =>
-			this.kimpanel?.triggerProperty(item.key),
+		const item = Lib.bindPropertyMenuItem(property, (key) =>
+			this.kimpanel?.triggerProperty(key),
 		);
-		item.menuItemDestroyId = item.connect("destroy", () => {
-			item.disconnect(item.menuItemActivateId);
-			item.disconnect(item.menuItemDestroyId);
-		});
-		item.setIcon(property.icon);
-		item.label.text = property.label;
 
 		this.propertySwitch.push(item);
 		this.addMenuItem(item);
@@ -96,15 +87,6 @@ export class KimMenu extends PopupMenu.PopupMenu {
 		this.eventCaptureId = global.stage.connect(
 			"captured-event",
 			this.onEventCapture.bind(this),
-		);
-		// captured-event doesn't see enter/leave events
-		this.enterEventId = global.stage.connect(
-			"enter-event",
-			this.onHoverCapture.bind(this),
-		);
-		this.leaveEventId = global.stage.connect(
-			"leave-event",
-			this.onHoverCapture.bind(this),
 		);
 		this.keyFocusNotifyId = global.stage.connect(
 			"notify::key-focus",
@@ -131,12 +113,6 @@ export class KimMenu extends PopupMenu.PopupMenu {
 			this.close(PopupAnimation.NONE);
 			return true;
 		}
-		return false;
-	}
-
-	private onHoverCapture() {
-		if (!this.grabbed) return false;
-
 		return false;
 	}
 
@@ -191,14 +167,14 @@ export class KimMenu extends PopupMenu.PopupMenu {
 	}
 
 	private ungrab() {
-		global.stage.disconnect(this.eventCaptureId);
-		this.eventCaptureId = 0;
-		global.stage.disconnect(this.enterEventId);
-		this.enterEventId = 0;
-		global.stage.disconnect(this.leaveEventId);
-		this.leaveEventId = 0;
-		global.stage.disconnect(this.keyFocusNotifyId);
-		this.keyFocusNotifyId = 0;
+		if (this.eventCaptureId !== 0) {
+			global.stage.disconnect(this.eventCaptureId);
+			this.eventCaptureId = 0;
+		}
+		if (this.keyFocusNotifyId !== 0) {
+			global.stage.disconnect(this.keyFocusNotifyId);
+			this.keyFocusNotifyId = 0;
+		}
 		this.grabbed = false;
 		Main.popModal(this.actor);
 	}

@@ -9,7 +9,6 @@ const replace = (): RolldownPlugin => {
 		transform(code) {
 			return {
 				code: code
-					.replaceAll(/\s*\/\/ begin-remove[\s\S]+?\/\/ end-remove/g, "")
 					.replaceAll(/\s*\/\*[\s\S]+?\*\//g, "")
 					.replaceAll(/^\s*\/\/.*?\n/gm, ""),
 				map: { mappings: "" },

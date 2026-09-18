@@ -8,14 +8,13 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import type { MenuItemProperty } from "./types/menuItem.js";
 
 class KimMenuItemClass extends PopupMenu.PopupBaseMenuItem {
-	// begin-remove
-	public key!: string;
-	public label: St.Label;
-	public menuItemActivateId!: number;
-	public menuItemDestroyId!: number;
+	declare public key: string;
+	declare public label: St.Label;
+	declare public menuItemActivateId: number;
+	declare public menuItemDestroyId: number;
 
-	private _icon: St.Icon;
-	// end-remove
+	declare private _icon: St.Icon;
+
 	constructor(
 		text: string,
 		iconName: string,
@@ -71,6 +70,28 @@ export const createIcon = (name: string): Gio.Icon | undefined => {
 
 	iconCache.set(name, icon);
 	return icon;
+};
+
+export const applyPropertyToMenuItem = (
+	item: typeof KimMenuItem.prototype,
+	property: MenuItemProperty,
+): void => {
+	item.setIcon(property.icon);
+	item.label.text = property.label;
+};
+
+export const bindPropertyMenuItem = (
+	property: MenuItemProperty,
+	onTrigger: (key: string) => void,
+): typeof KimMenuItem.prototype => {
+	const item = createMenuItem(property);
+	item.menuItemActivateId = item.connect("activate", () => onTrigger(item.key));
+	item.menuItemDestroyId = item.connect("destroy", () => {
+		item.disconnect(item.menuItemActivateId);
+		item.disconnect(item.menuItemDestroyId);
+	});
+	applyPropertyToMenuItem(item, property);
+	return item;
 };
 
 export const createMenuItem = (property: MenuItemProperty) => {
