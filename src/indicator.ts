@@ -7,8 +7,9 @@ import * as Params from "resource:///org/gnome/shell/misc/params.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import {
+	applyPropertyToMenuItem,
+	bindPropertyMenuItem,
 	createIcon,
-	createMenuItem,
 	extractLabelString,
 	type KimMenuItem,
 	parseProperty,
@@ -17,14 +18,13 @@ import type { IKimPanel } from "./types/kimpanel.js";
 import type { MenuItemProperty } from "./types/menuItem.js";
 
 class KimIndicatorClass extends PanelMenu.Button {
-	// begin-remove
-	public kimpanel: IKimPanel | null;
-	public labelIcon: St.Label;
-	public mainIcon: St.Icon;
+	declare public kimpanel: IKimPanel | null;
+	declare public labelIcon: St.Label;
+	declare public mainIcon: St.Icon;
 
-	private properties: Record<string, MenuItemProperty>;
-	private propertySwitch: Record<string, typeof KimMenuItem.prototype>;
-	// end-remove
+	declare private properties: Record<string, MenuItemProperty>;
+	declare private propertySwitch: Record<string, typeof KimMenuItem.prototype>;
+
 	constructor(params: { kimpanel: IKimPanel }) {
 		super(0.5, _("IMPanel with OSK"));
 		const _params = Params.parse(params, { kimpanel: null });
@@ -60,6 +60,7 @@ class KimIndicatorClass extends PanelMenu.Button {
 	}
 
 	public active(): void {
+		this.show();
 		if (this.properties["/Fcitx/im"]) {
 			this.setIcon(this.properties["/Fcitx/im"]);
 		} else {
@@ -127,6 +128,8 @@ class KimIndicatorClass extends PanelMenu.Button {
 		const key = property.key;
 		this.properties[key] = property;
 		if (key in this.propertySwitch) this.updatePropertyItem(key);
+		else this.addPropertyItem(key);
+		this.show();
 	}
 
 	private addPropertyItem(key: string): void {
@@ -134,17 +137,9 @@ class KimIndicatorClass extends PanelMenu.Button {
 			return;
 		}
 		const property = this.properties[key];
-		const item = createMenuItem(property);
-
-		item.menuItemActivateId = item.connect("activate", () =>
-			this.kimpanel?.triggerProperty(item.key),
+		const item = bindPropertyMenuItem(property, (itemKey) =>
+			this.kimpanel?.triggerProperty(itemKey),
 		);
-		item.menuItemDestroyId = item.connect("destroy", () => {
-			item.disconnect(item.menuItemActivateId);
-			item.disconnect(item.menuItemDestroyId);
-		});
-		item.setIcon(property.icon);
-		item.label.text = property.label;
 
 		this.propertySwitch[key] = item;
 		if ("addMenuItem" in this.menu)
@@ -184,10 +179,7 @@ class KimIndicatorClass extends PanelMenu.Button {
 	}
 
 	private updatePropertyItem(key: string): void {
-		const property = this.properties[key];
-		const item = this.propertySwitch[key];
-		item.setIcon(property.icon);
-		item.label.text = property.label;
+		applyPropertyToMenuItem(this.propertySwitch[key], this.properties[key]);
 	}
 }
 

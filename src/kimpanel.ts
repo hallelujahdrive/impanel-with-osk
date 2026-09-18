@@ -1,156 +1,45 @@
-import Gio from "gi://Gio";
-import GLib from "gi://GLib";
+import type Gio from "gi://Gio";
 import GObject from "gi://GObject";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { KimIndicator } from "./indicator.js";
+import type { DisplayDirty } from "./inputState.js";
+import { InputState } from "./inputState.js";
 import { Keyboard } from "./keyboard.js";
+import {
+	KimpanelDBus,
+	type KimpanelDBusHost,
+	type KimpanelDBusListener,
+} from "./kimpanelDbus.js";
 import * as Lib from "./lib.js";
 import { KimMenu } from "./menu.js";
 import { InputPanel } from "./panel.js";
 import { SuggestionsManager } from "./suggestions.js";
 import type { IKimPanel } from "./types/kimpanel.js";
 
-type InputPanelUpdateFlags = {
-	aux?: boolean;
-	lookupCursor?: boolean;
-	lookupTable?: boolean;
-	position?: boolean;
-	preedit?: boolean;
-};
-
-// biome-ignore lint/suspicious/noExplicitAny: GIR callback signature
-const EMPTY_VARIANT = null as unknown as GLib.Variant<any>;
-
-const unpackBool = (param: GLib.Variant): boolean =>
-	param.get_child_value(0).get_boolean();
-
-const unpackInt = (param: GLib.Variant, index = 0): number =>
-	param.get_child_value(index).get_int32();
-
-const unpackStr = (param: GLib.Variant, index = 0): string =>
-	param.get_child_value(index).unpack() as string;
-
-const FCITX_BUS_NAME = "org.fcitx.Fcitx5" as const;
-const FCITX_CONTROLLER_OBJECT_PATH = "/controller" as const;
-const FCITX_INTERFACE_CONTROLLER = "org.fcitx.Fcitx.Controller1" as const;
-
-const KIMPANEL_INTERFACE_INPUTMETHOD = "org.kde.kimpanel.inputmethod" as const;
-
-const KimpanelIface = `<node>
-<interface name="org.kde.impanel">
-  <signal name="MovePreeditCaret">
-    <arg type="i" name="position" />
-  </signal>
-  <signal name="SelectCandidate">
-    <arg type="i" name="index" />
-  </signal>
-  <signal name="LookupTablePageUp"></signal>
-  <signal name="LookupTablePageDown"></signal>
-  <signal name="TriggerProperty"> 
-    <arg type="s" name="key" />
-  </signal>
-  <signal name="PanelCreated"></signal>
-  <signal name="Exit"></signal>
-  <signal name="ReloadConfig"></signal>
-  <signal name="Configure"></signal>
-  </interface>
-</node>`;
-
-const Kimpanel2Iface = `<node>
-<interface name="org.kde.impanel2">
-  <signal name="PanelCreated2"></signal>
-  <method name="SetSpotRect">
-    <arg type="i" name="x" direction="in" />
-    <arg type="i" name="y" direction="in" />
-    <arg type="i" name="w" direction="in" />
-    <arg type="i" name="h" direction="in" />
-  </method>
-  <method name="SetRelativeSpotRect">
-    <arg type="i" name="x" direction="in" />
-    <arg type="i" name="y" direction="in" />
-    <arg type="i" name="w" direction="in" />
-    <arg type="i" name="h" direction="in" />
-  </method>
-  <method name="SetRelativeSpotRectV2">
-    <arg type="i" name="x" direction="in" />
-    <arg type="i" name="y" direction="in" />
-    <arg type="i" name="w" direction="in" />
-    <arg type="i" name="h" direction="in" />
-    <arg type="d" name="scale" direction="in" />
-  </method>
-  <method name="SetLookupTable">
-    <arg direction="in" type="as" name="label"/>
-    <arg direction="in" type="as" name="text"/>
-    <arg direction="in" type="as" name="attr"/>
-    <arg direction="in" type="b" name="hasPrev"/>
-    <arg direction="in" type="b" name="hasNext"/>
-    <arg direction="in" type="i" name="cursor"/>
-    <arg direction="in" type="i" name="layout"/>
-  </method>
-</interface>
-</node>`;
-
-const HelperIface = `<node>
-<interface name="org.fcitx.GnomeHelper">
-  <method name="LockXkbGroup">
-    <arg direction="in" type="i" name="idx"/>
-  </method>
-  </interface>
-</node>`;
-
 export const Kimpanel = GObject.registerClass(
-	class Kimpanel extends GObject.Object implements IKimPanel {
-		// begin-remove
-		public aux!: string;
-		public conn: Gio.DBusConnection | null;
-		public currentService: string;
-		public dbusSignal: number;
-		public enabled!: boolean;
-		public h!: number;
-		public helperOwnerId: number;
-		public indicator: null | typeof KimIndicator.prototype;
-		public keyboard: null | typeof Keyboard.prototype;
-		public menu: null | typeof KimMenu.prototype;
-		public oskSuggestionsFontSignal: number;
-		public ownerId: number;
-		public panelFontSignal: number;
-		public panelVerticalSignal: number;
-		public pos!: number;
-		public preedit!: string;
-		public relative!: boolean;
-		public scale!: number;
-		public settings: Gio.Settings | null;
-		public showAux!: boolean;
-		public showLookupTable!: boolean;
-		public showPreedit!: boolean;
-		public w!: number;
-		public watchId: number;
-		public x!: number;
-		public y!: number;
+	class Kimpanel
+		extends GObject.Object
+		implements IKimPanel, KimpanelDBusHost, KimpanelDBusListener
+	{
+		declare public indicator: null | typeof KimIndicator.prototype;
+		declare public keyboard: null | typeof Keyboard.prototype;
+		declare public menu: null | typeof KimMenu.prototype;
+		declare public oskSuggestionsFontSignal: number;
+		declare public panelFontSignal: number;
+		declare public panelVerticalSignal: number;
+		declare public settings: Gio.Settings | null;
 
-		private helperImpl: Gio.DBusExportedObject | null;
-		private impl: Gio.DBusExportedObject | null;
-		private impl2: Gio.DBusExportedObject | null;
-		private inputPanel: null | typeof InputPanel.prototype;
-		private isDestroyed: boolean;
-		private suggestionsManager: null | SuggestionsManager;
-		// end-remove
+		declare private dbus: null | typeof KimpanelDBus.prototype;
+		declare private inputPanel: null | typeof InputPanel.prototype;
+		declare private state: InputState;
+		declare private suggestionsManager: null | SuggestionsManager;
+
 		constructor(settings: Gio.Settings, dir: Gio.File) {
 			super();
 
-			this.isDestroyed = false;
-			this.resetData();
-			this.conn = Gio.bus_get_sync(Gio.BusType.SESSION, null);
+			this.state = new InputState();
 			this.settings = settings;
-			this.impl = Gio.DBusExportedObject.wrapJSObject(KimpanelIface, this);
-			this.impl.export(Gio.DBus.session, "/org/kde/impanel");
-			this.impl2 = Gio.DBusExportedObject.wrapJSObject(Kimpanel2Iface, this);
-			this.impl2.export(Gio.DBus.session, "/org/kde/impanel");
-			this.helperImpl = Gio.DBusExportedObject.wrapJSObject(HelperIface, this);
-			this.helperImpl.export(Gio.DBus.session, "/org/fcitx/GnomeHelper");
 			this.suggestionsManager = new SuggestionsManager(this);
-			this.currentService = "";
-			this.watchId = 0;
 			this.indicator = new KimIndicator({ kimpanel: this });
 			this.inputPanel = new InputPanel({ kimpanel: this });
 			this.keyboard = new Keyboard(this, dir);
@@ -176,56 +65,18 @@ export const Kimpanel = GObject.registerClass(
 			);
 
 			this.addToShell();
-			this.dbusSignal = this.conn.signal_subscribe(
-				null,
-				KIMPANEL_INTERFACE_INPUTMETHOD,
-				null,
-				null,
-				null,
-				Gio.DBusSignalFlags.NONE,
-				this.parseSignal.bind(this),
-			);
-			this.ownerId = Gio.bus_own_name(
-				Gio.BusType.SESSION,
-				"org.kde.impanel",
-				Gio.BusNameOwnerFlags.NONE,
-				null,
-				() => this.requestNameFinished(),
-				null,
-			);
-			this.helperOwnerId = Gio.bus_own_name(
-				Gio.BusType.SESSION,
-				"org.fcitx.GnomeHelper",
-				Gio.BusNameOwnerFlags.NONE,
-				null,
-				null,
-				null,
-			);
+			this.dbus = new KimpanelDBus(this, this);
 		}
 
 		public destroy(): void {
-			this.isDestroyed = true;
-			this.resetData();
-			this.updateInputPanel();
-			if (this.watchId !== 0) {
-				Gio.bus_unwatch_name(this.watchId);
-				this.watchId = 0;
-				this.currentService = "";
-			}
+			this.dbus?.destroy();
+			this.dbus = null;
+			this.state.reset();
+			this.updateDisplay();
 			this.settings?.disconnect(this.panelVerticalSignal);
 			this.settings?.disconnect(this.panelFontSignal);
 			this.settings?.disconnect(this.oskSuggestionsFontSignal);
 			this.settings = null;
-			this.conn?.signal_unsubscribe(this.dbusSignal);
-			this.conn = null;
-			Gio.bus_unown_name(this.ownerId);
-			Gio.bus_unown_name(this.helperOwnerId);
-			this.impl?.unexport();
-			this.impl = null;
-			this.impl2?.unexport();
-			this.impl2 = null;
-			this.helperImpl?.unexport();
-			this.helperImpl = null;
 			this.suggestionsManager = null;
 			// Menu need to be destroyed before indicator.
 			this.menu?.destroy();
@@ -239,7 +90,7 @@ export const Kimpanel = GObject.registerClass(
 		}
 
 		public emit(signal: string): void {
-			this.impl?.emit_signal(signal, EMPTY_VARIANT);
+			this.dbus?.emit(signal);
 		}
 
 		public getOskSuggestionsTextStyle(): string {
@@ -256,20 +107,83 @@ export const Kimpanel = GObject.registerClass(
 				: this.suggestionsManager?.layoutHint === 1;
 		}
 
-		LockXkbGroup(idx: number) {
+		public lockXkbGroup(idx: number): void {
 			global.backend.lock_layout_group(idx);
 		}
 
 		public lookupPageDown(): void {
-			this.impl?.emit_signal("LookupTablePageDown", EMPTY_VARIANT);
+			this.dbus?.lookupPageDown();
 		}
 
 		public lookupPageUp(): void {
-			this.impl?.emit_signal("LookupTablePageUp", EMPTY_VARIANT);
+			this.dbus?.lookupPageUp();
+		}
+
+		public onEnable(enabled: boolean): void {
+			this.state.setEnabled(enabled);
+			if (this.state.enabled) this.indicator?.active();
+			else this.indicator?.deactive();
+		}
+
+		public onExecMenu(properties: string[]): void {
+			this.menu?.execMenu(properties);
+		}
+
+		public onImExit(): void {
+			this.state.reset();
+			this.indicator?.updateProperties([]);
+			this.updateDisplay();
+		}
+
+		public onRegisterProperties(properties: string[]): void {
+			this.indicator?.updateProperties(properties);
+			if (this.state.enabled) this.indicator?.active();
+		}
+
+		public onShowAux(visible: boolean): void {
+			this.applyDisplayDirty(this.state.setShowAux(visible));
+		}
+
+		public onShowLookupTable(visible: boolean): void {
+			this.applyDisplayDirty(this.state.setShowLookupTable(visible));
+		}
+
+		public onShowPreedit(visible: boolean): void {
+			this.applyDisplayDirty(this.state.setShowPreedit(visible));
+		}
+
+		public onUpdateAux(text: string): void {
+			this.applyDisplayDirty(this.state.setAux(text));
+		}
+
+		public onUpdateLookupTableCursor(cursor: number): void {
+			if (this.suggestionsManager == null) return;
+			if (this.suggestionsManager.cursor === cursor) return;
+			this.suggestionsManager.cursor = cursor;
+			this.updateDisplay({ lookupCursor: true });
+		}
+
+		public onUpdatePreeditCaret(pos: number): void {
+			this.applyDisplayDirty(this.state.setCaret(pos));
+		}
+
+		public onUpdatePreeditText(text: string): void {
+			this.applyDisplayDirty(this.state.setPreedit(text));
+		}
+
+		public onUpdateProperty(value: string): void {
+			this.indicator?.updateProperty(value);
+			this.keyboard?.updateProperty(value);
+			if (this.state.enabled) this.indicator?.active();
+			else this.indicator?.deactive();
+		}
+
+		public onUpdateSpotLocation(x: number, y: number): void {
+			this.applyDisplayDirty(this.state.setSpotLocation(x, y));
 		}
 
 		public selectCandidate(arg: number): void {
-			this.impl?.emit_signal("SelectCandidate", new GLib.Variant("(i)", [arg]));
+			this.dbus?.selectCandidate(arg);
 			this.suggestionsManager?.reset();
 			Main.keyboard.resetSuggestions();
 		}
@@ -278,7 +192,7 @@ export const Kimpanel = GObject.registerClass(
 			this.suggestionsManager?.selectCandidate(arg);
 		}
 
-		SetLookupTable(
+		public setLookupTable(
 			labels: string[],
 			texts: string[],
 			attrs: string[],
@@ -287,64 +201,39 @@ export const Kimpanel = GObject.registerClass(
 			cursor: number,
 			layout: number,
 		): void {
-			const shouldRenderSuggestions =
-				this.suggestionsManager?.setLookupTable(
-					labels,
-					texts,
-					attrs,
-					hasPrev,
-					hasNext,
-					cursor,
-					layout,
-				) ?? false;
-
-			if (Lib.keyboardIsVisible()) {
-				if (shouldRenderSuggestions && this.suggestionsManager != null)
-					this.keyboard?.setSuggestions(this.suggestionsManager.allTexts);
-			} else {
-				this.inputPanel?.setVertical(this.isLookupTableVertical());
-				this.updateInputPanel({
-					lookupCursor: true,
-					lookupTable: true,
-					position: true,
-				});
-			}
+			this.suggestionsManager?.setLookupTable(
+				labels,
+				texts,
+				attrs,
+				hasPrev,
+				hasNext,
+				cursor,
+				layout,
+			);
+			this.updateDisplay({
+				lookupCursor: true,
+				lookupTable: true,
+				position: true,
+			});
 		}
 
-		SetRelativeSpotRect(x: number, y: number, w: number, h: number): void {
-			this.setRect(x, y, w, h, true, 1);
-		}
-
-		SetRelativeSpotRectV2(
+		public setSpotRect(
 			x: number,
 			y: number,
 			w: number,
 			h: number,
+			relative: boolean,
 			scale: number,
 		): void {
-			this.setRect(x, y, w, h, true, scale);
-		}
-
-		SetSpotRect(x: number, y: number, w: number, h: number): void {
-			this.setRect(x, y, w, h, false, 1);
+			this.applyDisplayDirty(this.state.setRect(x, y, w, h, relative, scale));
 		}
 
 		public toggleIM(): void {
-			this.conn?.call(
-				FCITX_BUS_NAME,
-				FCITX_CONTROLLER_OBJECT_PATH,
-				FCITX_INTERFACE_CONTROLLER,
-				"Toggle",
-				null,
-				null,
-				Gio.DBusCallFlags.NONE,
-				-1,
-				null,
-			);
+			this.dbus?.toggleIM();
 		}
 
 		public triggerProperty(arg: string): void {
-			this.impl?.emit_signal("TriggerProperty", new GLib.Variant("(s)", [arg]));
+			this.dbus?.triggerProperty(arg);
 		}
 
 		private addToShell(): void {
@@ -362,242 +251,44 @@ export const Kimpanel = GObject.registerClass(
 				Main.panel.addToStatusArea("kimpanel", this.indicator);
 		}
 
-		private imExit(_conn: Gio.DBusConnection, name: string): void {
-			if (this.currentService === name) {
-				this.currentService = "";
-				if (this.watchId !== 0) {
-					Gio.bus_unwatch_name(this.watchId);
-					this.watchId = 0;
-				}
-
-				this.resetData();
-				this.indicator?.updateProperties([]);
-				this.updateInputPanel();
-			}
+		private applyDisplayDirty(dirty: DisplayDirty | null): void {
+			if (dirty != null) this.updateDisplay(dirty);
 		}
 
-		private parseSignal(
-			_conn: Gio.DBusConnection,
-			sender: null | string,
-			_object: string,
-			_iface: string,
-			signal: string,
-			param: GLib.Variant,
-		): void {
-			if (this.isDestroyed) {
-				return;
-			}
-
-			let dirty: InputPanelUpdateFlags | null = null;
-			const mark = (flags: InputPanelUpdateFlags) => {
-				if (dirty == null) dirty = { ...flags };
-				else Object.assign(dirty, flags);
-			};
-
-			switch (signal) {
-				case "Enable": {
-					const value = unpackBool(param);
-
-					this.enabled = value;
-					if (this.enabled) this.indicator?.active();
-					else this.indicator?.deactive();
-					break;
-				}
-				case "ExecMenu": {
-					const [value] = param.unpack() as [string[]];
-
-					this.menu?.execMenu(value);
-					break;
-				}
-				case "RegisterProperties": {
-					const [value] = param.unpack() as [string[]];
-
-					if (sender != null && this.currentService !== sender) {
-						this.currentService = sender;
-						if (this.watchId !== 0) {
-							Gio.bus_unwatch_name(this.watchId);
-						}
-						this.watchId = Gio.bus_watch_name(
-							Gio.BusType.SESSION,
-							this.currentService,
-							Gio.BusNameWatcherFlags.NONE,
-							null,
-							this.imExit.bind(this),
-						);
-					}
-					this.indicator?.updateProperties(value);
-					break;
-				}
-				case "ShowAux": {
-					const value = unpackBool(param);
-
-					if (this.showAux !== value) {
-						mark({ aux: true, position: true });
-						if (!this.showPreedit) mark({ preedit: true });
-						if (!this.showLookupTable) mark({ lookupTable: true });
-					}
-					this.showAux = value;
-					break;
-				}
-				case "ShowLookupTable": {
-					const value = unpackBool(param);
-
-					if (this.showLookupTable !== value)
-						mark({
-							lookupCursor: true,
-							lookupTable: true,
-							position: true,
-						});
-					this.showLookupTable = value;
-					break;
-				}
-				case "ShowPreedit": {
-					const value = unpackBool(param);
-
-					if (this.showPreedit !== value) {
-						mark({ position: true, preedit: true });
-						if (!this.showLookupTable) mark({ lookupTable: true });
-					}
-					this.showPreedit = value;
-					break;
-				}
-				case "UpdateAux": {
-					const text = unpackStr(param, 0);
-
-					if (this.aux !== text) {
-						mark({ aux: true, position: true });
-						if (!this.showPreedit) mark({ preedit: true });
-						if (!this.showLookupTable) mark({ lookupTable: true });
-					}
-					this.aux = text;
-					break;
-				}
-				case "UpdateLookupTableCursor": {
-					const value = unpackInt(param);
-
-					if (this.suggestionsManager == null) break;
-					if (this.suggestionsManager.cursor !== value) {
-						this.suggestionsManager.cursor = value;
-						mark({ lookupCursor: true });
-					}
-					break;
-				}
-				case "UpdatePreeditCaret": {
-					const value = unpackInt(param);
-
-					if (this.pos !== value) mark({ preedit: true });
-					this.pos = value;
-					break;
-				}
-				case "UpdatePreeditText": {
-					const text = unpackStr(param, 0);
-
-					if (this.preedit !== text) mark({ position: true, preedit: true });
-					this.preedit = text;
-					break;
-				}
-				case "UpdateProperty": {
-					const value = unpackStr(param);
-
-					this.indicator?.updateProperty(value);
-					this.keyboard?.updateProperty(value);
-					if (this.enabled) this.indicator?.active();
-					else this.indicator?.deactive();
-					break;
-				}
-				case "UpdateSpotLocation": {
-					const x = unpackInt(param);
-					const y = unpackInt(param, 1);
-
-					if (this.x !== x || this.y !== y || this.w !== 0 || this.h !== 0)
-						mark({ position: true });
-					this.x = x;
-					this.y = y;
-					this.w = 0;
-					this.h = 0;
-					break;
-				}
-			}
-			if (dirty != null) this.updateInputPanel(dirty);
+		private renderOsk(flags?: DisplayDirty): void {
+			if (flags?.lookupTable !== true) return;
+			if (this.suggestionsManager == null) return;
+			if (!this.suggestionsManager.advanceOsk()) return;
+			this.keyboard?.setSuggestions(this.suggestionsManager.allTexts);
 		}
 
-		private requestNameFinished(): void {
-			if (this.isDestroyed) {
-				return;
-			}
-			this.impl?.emit_signal("PanelCreated", EMPTY_VARIANT);
-			this.impl2?.emit_signal("PanelCreated2", EMPTY_VARIANT);
-		}
-
-		private resetData(): void {
-			this.preedit = "";
-			this.aux = "";
-			this.x = 0;
-			this.y = 0;
-			this.w = 0;
-			this.h = 0;
-			this.relative = false;
-			this.scale = 1;
-			this.pos = 0;
-			this.showPreedit = false;
-			this.showLookupTable = false;
-			this.showAux = false;
-			this.enabled = false;
-		}
-
-		private setRect(
-			x: number,
-			y: number,
-			w: number,
-			h: number,
-			relative: boolean,
-			scale: number,
-		): void {
-			if (
-				this.x === x &&
-				this.y === y &&
-				this.w === w &&
-				this.h === h &&
-				this.relative === relative &&
-				this.scale === scale
-			) {
-				return;
-			}
-			this.x = x;
-			this.y = y;
-			this.w = w;
-			this.h = h;
-			this.relative = relative;
-			this.scale = scale;
-			this.updateInputPanel({ position: true });
-		}
-
-		private updateInputPanel(flags?: InputPanelUpdateFlags): void {
-			if (Lib.keyboardIsVisible()) return;
-
+		private renderPanel(flags?: DisplayDirty): void {
 			const all = flags == null;
 
 			if (all || flags.aux) {
-				if (this.showAux) {
-					this.inputPanel?.setAuxText(this.aux);
-				} else {
-					this.inputPanel?.hideAux();
-				}
+				if (this.state.showAux) this.inputPanel?.setAuxText(this.state.aux);
+				else this.inputPanel?.hideAux();
+			} else if (!this.state.showAux) {
+				this.inputPanel?.hideAux();
 			}
+
 			if (all || flags.preedit) {
-				if (this.showPreedit) {
-					this.inputPanel?.setPreeditText(this.preedit, this.pos);
-				} else {
-					this.inputPanel?.hidePreedit();
-				}
+				if (this.state.showPreedit)
+					this.inputPanel?.setPreeditText(this.state.preedit, this.state.pos);
+				else this.inputPanel?.hidePreedit();
+			} else if (!this.state.showPreedit) {
+				this.inputPanel?.hidePreedit();
 			}
 
 			if (all || flags.lookupTable) {
+				this.inputPanel?.setVertical(this.isLookupTableVertical());
 				this.inputPanel?.setLookupTable(
 					this.suggestionsManager?.labels ?? [],
 					this.suggestionsManager?.texts ?? [],
-					this.showLookupTable,
+					this.state.showLookupTable,
 				);
+			} else if (!this.state.showLookupTable) {
+				this.inputPanel?.hideLookup();
 			}
 
 			if (all || flags.lookupTable || flags.lookupCursor) {
@@ -607,8 +298,18 @@ export const Kimpanel = GObject.registerClass(
 			}
 
 			if (all || flags.position) {
-				this.inputPanel?.updatePosition();
+				this.inputPanel?.updatePosition(
+					this.state.spot(),
+					this.state.showAux ||
+						this.state.showPreedit ||
+						this.state.showLookupTable,
+				);
 			}
+		}
+
+		private updateDisplay(flags?: DisplayDirty): void {
+			if (Lib.keyboardIsVisible()) this.renderOsk(flags);
+			else this.renderPanel(flags);
 		}
 	},
 );
