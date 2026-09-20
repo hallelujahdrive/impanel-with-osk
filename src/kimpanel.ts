@@ -1,3 +1,4 @@
+import Clutter from "gi://Clutter";
 import type Gio from "gi://Gio";
 import GObject from "gi://GObject";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -47,7 +48,15 @@ export const Kimpanel = GObject.registerClass(
 
 			this.panelVerticalSignal = this.settings.connect(
 				"changed::panel-vertical",
-				() => this.inputPanel?.setVertical(this.isLookupTableVertical()),
+				() => {
+					this.inputPanel?.setOrientation(this.getLookupTableOrientation());
+					this.inputPanel?.updatePosition(
+						this.state.spot(),
+						this.state.showAux ||
+							this.state.showPreedit ||
+							this.state.showLookupTable,
+					);
+				},
 			);
 
 			this.panelFontSignal = this.settings.connect(
@@ -93,18 +102,18 @@ export const Kimpanel = GObject.registerClass(
 			this.dbus?.emit(signal);
 		}
 
+		public getLookupTableOrientation(): Clutter.Orientation {
+			if (this.suggestionsManager?.layoutHint === 1)
+				return Clutter.Orientation.VERTICAL;
+			return Lib.getLookupTableOrientation(this.settings);
+		}
+
 		public getOskSuggestionsTextStyle(): string {
 			return Lib.getOskSuggestionsTextStyle(this.settings);
 		}
 
 		public getPanelTextStyle(): string {
 			return Lib.getPanelTextStyle(this.settings);
-		}
-
-		public isLookupTableVertical(): boolean {
-			return this.suggestionsManager?.layoutHint === 0
-				? Lib.isLookupTableVertical(this.settings)
-				: this.suggestionsManager?.layoutHint === 1;
 		}
 
 		public lockXkbGroup(idx: number): void {
@@ -281,7 +290,7 @@ export const Kimpanel = GObject.registerClass(
 			}
 
 			if (all || flags.lookupTable) {
-				this.inputPanel?.setVertical(this.isLookupTableVertical());
+				this.inputPanel?.setOrientation(this.getLookupTableOrientation());
 				this.inputPanel?.setLookupTable(
 					this.suggestionsManager?.labels ?? [],
 					this.suggestionsManager?.texts ?? [],

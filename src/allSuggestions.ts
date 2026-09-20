@@ -59,9 +59,9 @@ export const AllSuggestions = GObject.registerClass(
 			this.panUpdateId = 0;
 
 			this.candidateContainer = new St.BoxLayout({
+				orientation: Clutter.Orientation.VERTICAL,
 				style: this.kimpanel.getOskSuggestionsTextStyle(),
 				styleClass: "word-suggestions word-all-suggestions",
-				vertical: true,
 				xAlign: Clutter.ActorAlign.FILL,
 				xExpand: true,
 				yExpand: true,
@@ -251,7 +251,7 @@ export const AllSuggestions = GObject.registerClass(
 			let row = this.rows[index];
 			if (row == null) {
 				row = new St.BoxLayout({
-					vertical: false,
+					orientation: Clutter.Orientation.HORIZONTAL,
 				});
 				this.rows[index] = row;
 			}

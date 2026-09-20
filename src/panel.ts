@@ -61,15 +61,15 @@ export const InputPanel = GObject.registerClass(
 			this.cursor = new St.Label({});
 
 			this.layout = new St.BoxLayout({
+				orientation: Clutter.Orientation.VERTICAL,
 				style_class: "popup-menu-content",
-				vertical: true,
 			});
 			this.layout.add_style_class_name("kimpanel-popup-content");
 			this.panel.bin.set_child(this.layout);
 
 			this.upperLayout = new St.BoxLayout();
 			this.lookupTableLayout = new St.BoxLayout({
-				vertical: this.kimpanel.isLookupTableVertical(),
+				orientation: this.kimpanel.getLookupTableOrientation(),
 			});
 			this.candidateLabels = [];
 			this.lookupCursor = -1;
@@ -126,8 +126,8 @@ export const InputPanel = GObject.registerClass(
 			const parent = lookup.get_parent();
 			if (parent == null) return;
 			parent.remove_child(lookup);
-			this.releaseWidth(this.layout);
-			this.releaseWidth(this.panel);
+			this.releaseSize(this.layout);
+			this.releaseSize(this.panel);
 		}
 
 		public hidePreedit(): void {
@@ -186,9 +186,9 @@ export const InputPanel = GObject.registerClass(
 			}
 
 			if (this.lookupCursor >= len) this.lookupCursor = -1;
-			this.releaseWidth(lookup);
-			this.releaseWidth(this.layout);
-			this.releaseWidth(this.panel);
+			this.releaseSize(lookup);
+			this.releaseSize(this.layout);
+			this.releaseSize(this.panel);
 		}
 
 		public setLookupTableCursor(cursor: number): void {
@@ -203,15 +203,36 @@ export const InputPanel = GObject.registerClass(
 			this.lookupCursor = cursor;
 		}
 
+		public setOrientation(orientation: Clutter.Orientation): void {
+			const lookup = this.lookupTableLayout;
+			if (lookup == null) return;
+
+			const manager = lookup.layout_manager as Clutter.BoxLayout | null;
+			const current = manager?.orientation ?? lookup.orientation;
+			if (current === orientation) return;
+
+			const parent = lookup.get_parent();
+			if (parent != null) parent.remove_child(lookup);
+
+			lookup.orientation = orientation;
+			if (manager != null) manager.orientation = orientation;
+
+			for (const item of this.candidateLabels) {
+				item.set_size(-1, -1);
+			}
+
+			if (parent != null) parent.add_child(lookup);
+
+			this.releaseSize(lookup);
+			this.releaseSize(this.layout);
+			this.releaseSize(this.panel);
+		}
+
 		public setPreeditText(text: string, pos: number): void {
 			this.showUpperLabel(
 				this.preeditText,
 				`${text.slice(0, pos)}|${text.slice(pos)}`,
 			);
-		}
-
-		public setVertical(vertical: boolean): void {
-			this.lookupTableLayout?.set_vertical(vertical);
 		}
 
 		public updateFont(textStyle: string): void {
@@ -326,8 +347,8 @@ export const InputPanel = GObject.registerClass(
 			this.panel?.close(BoxPointer.PopupAnimation.NONE);
 		}
 
-		private releaseWidth(actor: Clutter.Actor | null): void {
-			actor?.set_width(-1);
+		private releaseSize(actor: Clutter.Actor | null): void {
+			actor?.set_size(-1, -1);
 			actor?.queue_relayout();
 		}
 
@@ -352,9 +373,9 @@ export const InputPanel = GObject.registerClass(
 			if (label.get_parent() !== this.upperLayout)
 				this.upperLayout.add_child(label);
 			if (!label.visible) label.show();
-			this.releaseWidth(this.upperLayout);
-			this.releaseWidth(this.layout);
-			this.releaseWidth(this.panel);
+			this.releaseSize(this.upperLayout);
+			this.releaseSize(this.layout);
+			this.releaseSize(this.panel);
 		}
 
 		private unparentHiddenLabel(label: null | St.Label): void {
@@ -364,9 +385,9 @@ export const InputPanel = GObject.registerClass(
 			if (label.visible) label.hide();
 			if (parent != null) parent.remove_child(label);
 			label.set_width(-1);
-			this.releaseWidth(this.upperLayout);
-			this.releaseWidth(this.layout);
-			this.releaseWidth(this.panel);
+			this.releaseSize(this.upperLayout);
+			this.releaseSize(this.layout);
+			this.releaseSize(this.panel);
 		}
 	},
 );

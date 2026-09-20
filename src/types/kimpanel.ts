@@ -1,9 +1,9 @@
+import type Clutter from "gi://Clutter";
 import type GObject from "gi://GObject";
-
 export interface IKimPanel extends GObject.Object {
+	getLookupTableOrientation(): Clutter.Orientation;
 	getOskSuggestionsTextStyle(): string;
 	getPanelTextStyle(): string;
-	isLookupTableVertical(): boolean;
 	lookupPageDown(): void;
 	lookupPageUp(): void;
 	selectCandidate(arg?: number): void;

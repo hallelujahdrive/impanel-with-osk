@@ -117,10 +117,12 @@ export const keyboardIsVisible = (): boolean => {
 	return Main.keyboard._keyboard?.visible ?? false;
 };
 
-export const isLookupTableVertical = (
+export const getLookupTableOrientation = (
 	settings: Gio.Settings | null,
-): boolean => {
-	return settings?.get_boolean("panel-vertical") ?? false;
+): Clutter.Orientation => {
+	return (settings?.get_boolean("panel-vertical") ?? false)
+		? Clutter.Orientation.VERTICAL
+		: Clutter.Orientation.HORIZONTAL;
 };
 
 export const extractLabelString = (label: string): string => {
